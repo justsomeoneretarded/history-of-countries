@@ -9,7 +9,7 @@ This version uses **real photographs, historical artwork, and reusable video exc
 1. Under **Settings → Secrets and variables → Actions**, add **gemini_api_key**.
 2. Open **Actions → Create a simple history video → Run workflow**.
 3. Enter your title and brief. Charon is the default voice; the other listed Gemini voices are optional. The default target is 8.75 minutes.
-4. Download the **countries-video** artifact. Use final.mp4, thumbnail.jpg, title.txt, description.txt and captions.srt for YouTube.
+4. When the workflow finishes successfully, download the **countries-video** artifact. A completed full export has **upload_ready: true** in delivery.json. Use final.mp4, thumbnail.jpg, title.txt, description.txt and captions.srt for YouTube.
 
 The workflow does not publish to YouTube. A preview uses the first three consecutive scenes and is labeled as a preview in delivery.json.
 
@@ -32,7 +32,7 @@ The source components and pinned revision are listed in REUSED_FROM.md. Chatterb
 
 ## Images and footage
 
-Gemini orders approved media to match the spoken story. The editor cuts about every 3–4.5 seconds. Cairo applies fractional image transforms, avoiding integer-rounded pan/zoom jumps.
+Gemini chooses approved media for short cues taken from the actual spoken-word timing. Repeated photographs keep one continuous camera movement across edit boundaries. The editor changes shots about every 3–4.5 seconds. The year is rendered into each shot, and final assembly preserves the encoded picture instead of recompressing the whole film. Cairo applies fractional image transforms, avoiding integer-rounded pan/zoom jumps.
 
 YouTube discovery accepts only videos with an explicit Creative Commons attribution reuse license and a matching subject/date. Optional source URLs can be provided in the workflow. Standard-license, private and DRM material is excluded. YouTube sometimes blocks hosted-runner extraction; the runner records the result and uses available licensed archive imagery/footage. **media-discovery.json reports how many YouTube clips were actually used.**
 
