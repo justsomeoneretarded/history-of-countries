@@ -74,3 +74,11 @@ def test_actual_image_and_video_clips_encode_and_join_without_black_gaps(tmp_pat
     ffmpeg("-i",still,"-vf","select=eq(n\\,0)","-frames:v","1",start)
     ffmpeg("-i",still,"-vf","select=eq(n\\,50)","-frames:v","1",end)
     assert np.mean(np.abs(np.asarray(Image.open(start),dtype=float)-np.asarray(Image.open(end),dtype=float)))>.2
+
+
+def test_youtube_search_uses_the_reuse_filter_but_still_requires_result_license():
+    from urllib.parse import urlparse,parse_qs
+    query=parse_qs(urlparse(youtube.search_url("Ethiopia 1935 footage")).query)
+    assert query["search_query"]==["Ethiopia 1935 footage"]
+    assert query["sp"]==["EgIwAQ=="]
+    assert not youtube.reusable({"id":"tn2ehtuk1Gk","title":"creative commons footage"})

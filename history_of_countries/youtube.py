@@ -3,7 +3,9 @@ from pathlib import Path
 import hashlib
 import re
 import time
-from urllib.parse import urlparse,parse_qs
+import shutil
+from itertools import islice
+from urllib.parse import urlparse,parse_qs,urlencode
 from .core import PipelineError,key,read_json,save_json,probe
 
 def video_id(url):
@@ -12,6 +14,10 @@ def video_id(url):
     ident=parsed.path.strip("/") if host=="youtu.be" else parse_qs(parsed.query).get("v",[""])[0] if host in {"youtube.com","www.youtube.com","m.youtube.com"} else ""
     if not re.fullmatch(r"[A-Za-z0-9_-]{11}",ident):raise PipelineError("Supply a public YouTube watch URL")
     return ident
+
+def search_url(query):
+    # YouTube's Creative Commons search filter; each result is checked again.
+    return "https://www.youtube.com/results?"+urlencode({"search_query":query,"sp":"EgIwAQ=="})
 
 def reusable(info):
     license=str(info.get("license","")).casefold()
@@ -42,7 +48,10 @@ def discover(script,directory,urls=(),max_queries=3,max_clips=5,ydl_factory=None
     factory=ydl_factory or YoutubeDL
     assets=[];assignments={};status=[];seen=set();started=time.monotonic()
     options={"quiet":True,"no_warnings":True,"noplaylist":True,"socket_timeout":12,
-             "retries":1,"extractor_retries":1,"skip_download":True,"ignoreerrors":False}
+             "retries":1,"extractor_retries":1,"skip_download":True,"ignoreerrors":False,
+             "ignore_no_formats_error":True,"playlistend":5,"lazy_playlist":True}
+    node=shutil.which("node")
+    if node:options["js_runtimes"]={"node":{"path":node}}
     jobs=[("https://www.youtube.com/watch?v="+video_id(u),None) for u in list(urls)[:8]]
     eligible=[];decades=set()
     for scene in script["scenes"]:
@@ -51,14 +60,21 @@ def discover(script,directory,urls=(),max_queries=3,max_clips=5,ydl_factory=None
             eligible.append(scene);decades.add(years[0]//10)
     if not eligible:eligible=script["scenes"]
     for scene in eligible[:max_queries]:
-        jobs.append(("ytsearch3:"+scene["asset_search_term"]+" archival footage",scene))
+        jobs.append((search_url(scene["asset_search_term"]+" archival footage"),scene))
     for query,requested_scene in jobs:
         if len(assets)>=max_clips or time.monotonic()-started>180:break
         try:
-            with factory(options) as ydl:raw=ydl.extract_info(query,download=False)
-            candidates=raw.get("entries",[]) if raw and "entries" in raw else [raw]
+            settings={**options,**({"extract_flat":"in_playlist"} if requested_scene is not None else {})}
+            with factory(settings) as ydl:raw=ydl.extract_info(query,download=False)
+            candidates=islice(raw.get("entries") or [],5) if raw and "entries" in raw else [raw]
             for info in candidates:
                 if not isinstance(info,dict) or info.get("id") in seen:continue
+                if requested_scene is not None:
+                    try:
+                        with factory(options) as ydl:info=ydl.extract_info("https://www.youtube.com/watch?v="+info["id"],download=False)
+                    except Exception as exc:
+                        status.append({"video_id":info.get("id"),"status":"unavailable","reason":type(exc).__name__});continue
+                    if not isinstance(info,dict):continue
                 seen.add(info.get("id"))
                 if not reusable(info):
                     status.append({"video_id":info.get("id"),"status":"skipped","reason":"Explicit reusable CC BY license not established"});continue
