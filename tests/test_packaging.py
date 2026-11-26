@@ -9,7 +9,7 @@ def test_complete_youtube_package_uses_real_image_and_keeps_metadata_in_bounds(t
     output=tmp_path/"output";output.mkdir()
     work=tmp_path/"work";work.mkdir()
     script={"title":"The Entire History of Ethiopia","summary":"Choices and power across centuries.",
-      "scenes":[{"scene_id":1,"chapter":"Hook","narration":"Menelik prepares his army."}]}
+      "scenes":[{"scene_id":1,"chapter":"Hook","date_label":"1896","narration":"Menelik prepares his army."}]}
     speech={"scenes":[{"duration":12}]}
     assets={"assets":[{"id":"P","path":str(picture),"subject":"Menelik II portrait",
       "medium":"historical_photo","creator":"Historical archive","license":"Public domain",
