@@ -113,3 +113,14 @@ def test_one_invalid_gemini_cue_preserves_the_other_valid_choices():
     result,repairs=planning.repair_order(raw,script,catalogue,{"1":["A","A","A"],"2":["C"]})
     assert result=={"1":["B","A","B"],"2":["C"]}
     assert repairs==[{"scene_id":"1","cue":1,"reason":"unapproved_asset_id"}]
+
+
+def test_compact_transport_ids_round_trip_without_approving_unknown_ids():
+    payload={"media":[{"id":"archive-long-sha","subject":"A named event"},{"id":"photo-long-sha","subject":"A ruler"}],
+             "scenes":[{"scene_id":"1","allowed_asset_ids":["photo-long-sha"]}]}
+    compact,aliases=planning.compact_ids(payload)
+    assert compact["scenes"][0]["allowed_asset_ids"]==["A2"]
+    assert compact["media"][0]["id"]=="A1"
+    assert payload["media"][0]["id"]=="archive-long-sha"
+    decoded=planning.restore_ids({"scenes":[{"scene_id":"1","asset_ids":["A2","A999"]}]},aliases)
+    assert decoded["scenes"][0]["asset_ids"]==["photo-long-sha","A999"]

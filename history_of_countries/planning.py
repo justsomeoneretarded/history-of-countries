@@ -50,6 +50,20 @@ def repair_order(raw,script,media,fallback):
     return result,repairs
 
 
+def compact_ids(payload):
+    """Short transport IDs save tokens; only this exact table can decode them."""
+    aliases={a["id"]:"A"+str(i+1) for i,a in enumerate(payload["media"])}
+    compact={**payload,
+      "media":[{**a,"id":aliases[a["id"]]} for a in payload["media"]],
+      "scenes":[{**row,"allowed_asset_ids":[aliases[aid] for aid in row["allowed_asset_ids"]]} for row in payload["scenes"]]}
+    return compact,{short:original for original,short in aliases.items()}
+
+def restore_ids(raw,aliases):
+    if not isinstance(raw,dict) or not isinstance(raw.get("scenes"),list):return raw
+    return {**raw,"scenes":[{**row,"asset_ids":[aliases.get(aid,aid) if isinstance(aid,str) else aid for aid in row["asset_ids"]]}
+      if isinstance(row,dict) and isinstance(row.get("asset_ids"),list) else row for row in raw["scenes"]]}
+
+
 def _cues(spoken):
     seconds=float(spoken["duration"]);count=max(1,math.ceil(round(seconds*30)/135))
     words=spoken.get("words",[])
@@ -81,7 +95,7 @@ def _local_order(script,media,speech):
 
 def make(api,script,speech,media,directory):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
-    fingerprint=key("simple-order-v3-repair-cues",script,[s["duration"] for s in speech["scenes"]],
+    fingerprint=key("simple-order-v4-compact-ids",script,[s["duration"] for s in speech["scenes"]],
       [{k:a.get(k) for k in ("id","subject","date","context","sha256")} for a in media["assets"]],media["scenes"])
     path=directory/"storyboard.json"
     if path.exists():
@@ -99,9 +113,11 @@ def make(api,script,speech,media,directory):
           "shot_cues":_cues(spoken_by_id[str(s["scene_id"])]),
           "allowed_asset_ids":media["scenes"][str(s["scene_id"])]} for s in script["scenes"]],
           "media":[{k:a.get(k) for k in ("id","subject","date","medium","context")} for a in media["assets"]]}
+        payload,aliases=compact_ids(payload)
         try:
-            raw=api.text("Return exactly one allowed asset ID per shot_cue, in cue order, for every passage. Repeats are allowed when the same subject continues. Match the words of each individual cue; do not just cycle portraits across an entire scene. Order only the allowed real images and footage for each passage. Choose what is being spoken about, in the order it is spoken. Prefer relevant moving footage where date and subject match; use portraits for named people and surviving objects/places for ancient history. Do not treat modern views as contemporary footage of ancient events. Do not invent IDs, narration, or visual content. Return only JSON.",payload,schema,max_output=6500,
+            raw=api.text("Return exactly one allowed asset ID per shot_cue, in cue order, for every passage. Repeats are allowed when the same subject continues. Match the words of each individual cue; do not just cycle portraits across an entire scene. Order only the allowed real images and footage for each passage. Choose what is being spoken about, in the order it is spoken. Prefer relevant moving footage where date and subject match; use portraits for named people and surviving objects/places for ancient history. Do not treat modern views as contemporary footage of ancient events. Do not invent IDs, narration, or visual content. Return only JSON.",payload,schema,max_output=14000,
               model=os.getenv("GEMINI_PLANNER_MODEL","gemini-3.1-flash-lite"))
+            raw=restore_ids(raw,aliases)
             orders,repairs=repair_order(raw,script,media,orders)
             mode="Gemini_spoken_cue_media_order" if not repairs else "Gemini_spoken_cue_media_order_repaired"
             if repairs:print(f"Preserved valid Gemini media choices; repaired {len(repairs)} cues/rows against approved media.",flush=True)
