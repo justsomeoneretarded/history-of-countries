@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+work/
+output/
+assets/presets/ethiopia/*.jpg
+assets/music/*.ogg
+assets/footage/*.mp4

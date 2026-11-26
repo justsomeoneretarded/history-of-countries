@@ -1,0 +1,128 @@
+name: Create a simple history video
+on:
+  push:
+    branches: [main]
+    paths: ['production/requests/*.json']
+  workflow_dispatch:
+    inputs:
+      title:
+        description: Video title or country
+        required: true
+        default: The Entire History of Ethiopia
+        type: string
+      brief:
+        description: Short story brief and endpoint
+        required: true
+        type: string
+      voice:
+        description: Gemini narrator
+        type: choice
+        options: [Charon, Puck, Kore, Fenrir, Orus, Aoede, auto]
+        default: Charon
+      minutes:
+        description: Target duration, 0.5 to 10 minutes
+        type: number
+        default: 8.75
+      youtube:
+        description: Search for reusable YouTube footage
+        type: boolean
+        default: true
+      youtube_urls:
+        description: Optional public YouTube URLs; CC BY rights are checked
+        type: string
+      phase:
+        description: Full export or first three scenes as preview
+        type: choice
+        options: [full, preview]
+        default: full
+      resume_run:
+        description: Optional saved workflow run ID
+        type: string
+      resume_repository:
+        description: Optional owner/repository for that checkpoint
+        type: string
+      resume_artifact:
+        description: Checkpoint artifact
+        type: choice
+        options: [countries-checkpoint, directed-checkpoint, director-audio]
+        default: countries-checkpoint
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: countries-production
+  cancel-in-progress: false
+jobs:
+  video:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      PYTHONUNBUFFERED: '1'
+      HF_HUB_DISABLE_XET: '1'
+      HF_HOME: ${{ github.workspace }}/work/models/huggingface
+      GEMINI_SCHEMA_MODE: prompt
+      GEMINI_MODEL: gemini-3.1-flash-lite
+      GEMINI_PLANNER_MODEL: gemini-3.1-flash-lite
+      GEMINI_PACKAGE_MODEL: gemini-3.5-flash-lite
+      GEMINI_TTS_MODEL: gemini-3.8-flash-tts
+      GEMINI_MEDIA_LEDGER: work/countries/gemini/usage.json
+      GEMINI_TEXT_REQUEST_BUDGET: '32'
+      GEMINI_TTS_REQUEST_BUDGET: '16'
+      GEMINI_INPUT_TOKEN_BUDGET: '40000'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python scripts/bootstrap_media.py
+      - run: python -m pip install -e '.[alignment,test]'
+      - name: Test before provider calls
+        run: python -m pytest -q
+      - name: Read the title and brief
+        run: python scripts/request.py configure
+      - uses: actions/cache@v4
+        with:
+          path: work/models
+          key: countries-whisper-base-en-v1
+      - uses: actions/cache@v4
+        with:
+          path: |
+            assets/music/*.ogg
+            assets/footage/*.mp4
+            assets/presets/ethiopia/*.jpg
+          key: countries-bundled-18eee915-v1
+      - name: Recover saved narration and writing
+        if: env.RESUME_RUN != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.RESUME_ARTIFACT }}
+          run-id: ${{ env.RESUME_RUN }}
+          repository: ${{ env.RESUME_REPOSITORY }}
+          github-token: ${{ github.token }}
+          path: work/restore
+      - name: Keep only useful checkpoint files
+        if: env.RESUME_RUN != ''
+        run: python scripts/request.py restore
+      - name: Write, narrate and edit the video
+        env:
+          GEMINI_API_KEY: ${{ secrets.gemini_api_key }}
+        run: python -m history_of_countries.runner --request work/input.json
+      - name: Preserve checkpoints
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: countries-checkpoint
+          path: work/countries
+          retention-days: 90
+          if-no-files-found: warn
+      - name: Download the video and upload files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: countries-video
+          path: output/countries
+          retention-days: 90
+          if-no-files-found: warn
