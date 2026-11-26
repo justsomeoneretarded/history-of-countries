@@ -21,6 +21,35 @@ def validate_order(raw,script,media):
     if set(found)!={str(s["scene_id"]) for s in script["scenes"]}:raise PipelineError("Shot order omitted or invented a scene")
     return found
 
+def repair_order(raw,script,media,fallback):
+    """Keep valid Gemini choices; replace only missing or unapproved cues."""
+    rows=raw.get("scenes") if isinstance(raw,dict) else None
+    if not isinstance(rows,list):raise PipelineError("Shot order needs a scenes array")
+    found={};repairs=[]
+    for row in rows:
+        if not isinstance(row,dict):raise PipelineError("Invalid shot-order row")
+        ident=str(row.get("scene_id",""))
+        if ident in found:raise PipelineError("Duplicate shot-order scene")
+        found[ident]=row.get("asset_ids")
+    result={}
+    for scene in script["scenes"]:
+        ident=str(scene["scene_id"]);base=fallback[ident];proposed=found.get(ident)
+        allowed=set(media["scenes"][ident])
+        if not isinstance(proposed,list) or len(proposed)!=len(base):
+            result[ident]=list(base)
+            repairs.append({"scene_id":ident,"reason":"missing_or_wrong_cue_count"})
+            continue
+        result[ident]=[]
+        for index,aid in enumerate(proposed):
+            if isinstance(aid,str) and aid in allowed:
+                result[ident].append(aid)
+            else:
+                result[ident].append(base[index])
+                repairs.append({"scene_id":ident,"cue":index,"reason":"unapproved_asset_id"})
+    validate_order({"scenes":[{"scene_id":k,"asset_ids":v} for k,v in result.items()]},script,media)
+    return result,repairs
+
+
 def _cues(spoken):
     seconds=float(spoken["duration"]);count=max(1,math.ceil(round(seconds*30)/135))
     words=spoken.get("words",[])
@@ -52,7 +81,7 @@ def _local_order(script,media,speech):
 
 def make(api,script,speech,media,directory):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
-    fingerprint=key("simple-order-v2-spoken-cues",script,[s["duration"] for s in speech["scenes"]],
+    fingerprint=key("simple-order-v3-repair-cues",script,[s["duration"] for s in speech["scenes"]],
       [{k:a.get(k) for k in ("id","subject","date","context","sha256")} for a in media["assets"]],media["scenes"])
     path=directory/"storyboard.json"
     if path.exists():
@@ -60,7 +89,7 @@ def make(api,script,speech,media,directory):
         if previous.get("fingerprint")==fingerprint:
             orders=validate_order(previous,script,media)
             return shots(script,speech,media,orders),previous
-    orders=_local_order(script,media,speech);mode="local_relevant_media";failure=None
+    orders=_local_order(script,media,speech);mode="local_relevant_media";failure=None;repairs=[]
     if api is not None:
         schema={"type":"object","required":["scenes"],"properties":{"scenes":{"type":"array","items":{
           "type":"object","required":["scene_id","asset_ids"],"properties":{"scene_id":{"type":"string"},
@@ -73,14 +102,13 @@ def make(api,script,speech,media,directory):
         try:
             raw=api.text("Return exactly one allowed asset ID per shot_cue, in cue order, for every passage. Repeats are allowed when the same subject continues. Match the words of each individual cue; do not just cycle portraits across an entire scene. Order only the allowed real images and footage for each passage. Choose what is being spoken about, in the order it is spoken. Prefer relevant moving footage where date and subject match; use portraits for named people and surviving objects/places for ancient history. Do not treat modern views as contemporary footage of ancient events. Do not invent IDs, narration, or visual content. Return only JSON.",payload,schema,max_output=6500,
               model=os.getenv("GEMINI_PLANNER_MODEL","gemini-3.1-flash-lite"))
-            orders=validate_order(raw,script,media)
-            if any(len(orders[str(s["scene_id"])])!=len(_cues(spoken_by_id[str(s["scene_id"])])) for s in script["scenes"]):
-                raise PipelineError("Gemini did not supply one media choice per spoken shot cue")
-            mode="Gemini_spoken_cue_media_order"
+            orders,repairs=repair_order(raw,script,media,orders)
+            mode="Gemini_spoken_cue_media_order" if not repairs else "Gemini_spoken_cue_media_order_repaired"
+            if repairs:print(f"Preserved valid Gemini media choices; repaired {len(repairs)} cues/rows against approved media.",flush=True)
         except PipelineError as exc:
             # Simple editing remains possible using the same approved catalogue.
             failure=str(exc);print("Shot ordering uses the validated local catalogue: "+failure,flush=True)
-    result={"fingerprint":fingerprint,"mode":mode,"model_error":failure,
+    result={"fingerprint":fingerprint,"mode":mode,"model_error":failure,"repairs":repairs,
             "scenes":[{"scene_id":ident,"asset_ids":ids} for ident,ids in orders.items()]}
     save_json(path,result)
     return shots(script,speech,media,orders),result

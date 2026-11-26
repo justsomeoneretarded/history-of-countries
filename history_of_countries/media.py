@@ -51,6 +51,7 @@ def commons(script,directory,current,session=None,max_queries=20):
                 if not allowed_license(license):continue
                 title=clean(page.get("title","")).removeprefix("File:")
                 description=value("ImageDescription")
+                if re.search(r"\b(?:montage|collage|contact sheet)\b",title,re.I):continue
                 matching=subject_terms(title+" "+description)
                 required=subject_terms(scene.get("asset_search_term",""))-GENERIC_SUBJECT
                 if required and len(required&matching)<min(2,len(required)):continue

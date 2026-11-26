@@ -95,3 +95,21 @@ def test_repeated_photo_holds_one_continuous_camera_across_edit_boundaries():
         before=(previous["motion_offset_frames"]+previous["frames"]-1)/(frames-1)
         after=following["motion_offset_frames"]/(frames-1)
         assert after-before==pytest.approx(1/(frames-1))
+
+
+def test_restoration_word_never_moves_a_1941_photo_into_medieval_history():
+    from history_of_countries.documentary_assets import matching_assets
+    archive={"id":"1941","tags":["restoration"],"medium":"historical_photo","event_period":[1941,1941]}
+    medieval={"date_label":"1270 AD","narration":"The restoration of the Solomonic dynasty."}
+    liberation={"date_label":"1941","narration":"The restoration after occupation."}
+    assert matching_assets(medieval,[archive])==[]
+    assert matching_assets(liberation,[archive])==["1941"]
+
+def test_one_invalid_gemini_cue_preserves_the_other_valid_choices():
+    script={"scenes":[{"scene_id":1},{"scene_id":2}]}
+    catalogue={"scenes":{"1":["A","B"],"2":["C"]}}
+    raw={"scenes":[{"scene_id":"1","asset_ids":["B","wrong","B"]},
+                   {"scene_id":"2","asset_ids":["C"]}]}
+    result,repairs=planning.repair_order(raw,script,catalogue,{"1":["A","A","A"],"2":["C"]})
+    assert result=={"1":["B","A","B"],"2":["C"]}
+    assert repairs==[{"scene_id":"1","cue":1,"reason":"unapproved_asset_id"}]

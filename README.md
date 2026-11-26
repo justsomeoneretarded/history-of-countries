@@ -54,4 +54,4 @@ A full export is 1920×1080, 30 fps, H.264 video and AAC stereo audio. It includ
 
 Checks cover actual media decoding, frame/audio timing, verified speech, clipping headroom, black gaps and YouTube metadata limits. The test suite also encodes actual moving-image and footage cuts. Synthetic encoding tests do not certify Gemini pronunciation or artistic quality.
 
-Development and the first complete simple Ethiopia export are being tested. A saved narration or a passing test suite alone is not a finished video.
+The first complete Ethiopia export passed the 71-test suite and encoded-media checks: 508.64 seconds, 1920×1080 at 30 fps, Charon narration, −16.05 LUFS and no detected black intervals. Its 24 photographs and one archive-video source included no YouTube clips. The contact sheet exposed a medieval/1941 selection mismatch, which is corrected by an explicit depicted-period constraint; a subsequent production run validates that refinement. Reports distinguish technical readiness from historical or creative judgment.

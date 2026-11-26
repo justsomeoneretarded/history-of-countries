@@ -59,15 +59,24 @@ def discover(script,directory,urls=(),max_queries=3,max_clips=5,ydl_factory=None
         if years and years[0]//10 not in decades:
             eligible.append(scene);decades.add(years[0]//10)
     if not eligible:eligible=script["scenes"]
-    for scene in eligible[:max_queries]:
-        jobs.append((search_url(scene["asset_search_term"]+" archival footage"),scene))
+    country=re.sub(r"^(?:the\s+)?(?:entire\s+)?history\s+of\s+","",script.get("title",""),flags=re.I).split(":")[0]
+    # Broad country/year searches find archive releases that do not repeat a
+    # scriptwriter's long scene query. Include surviving-landmark footage too.
+    places=[s for s in script["scenes"] if re.search(r"\b(?:lalibela|stelae|temple|castle|ruins|pyramid|cathedral|palace)\b",s.get("asset_search_term",""),re.I)]
+    selected=eligible[:max_queries-1]+places[:1] if places else eligible[:max_queries]
+    for scene in selected:
+        year=re.search(r"\b(?:19|20)\d{2}\b",scene.get("date_label",""))
+        query=country+" "+year[0] if year else scene["asset_search_term"]
+        jobs.append((search_url(query),scene))
     for query,requested_scene in jobs:
         if len(assets)>=max_clips or time.monotonic()-started>180:break
         try:
             settings={**options,**({"extract_flat":"in_playlist"} if requested_scene is not None else {})}
             with factory(settings) as ydl:raw=ydl.extract_info(query,download=False)
             candidates=islice(raw.get("entries") or [],5) if raw and "entries" in raw else [raw]
+            count_before=len(assets);candidate_count=0
             for info in candidates:
+                candidate_count+=1
                 if not isinstance(info,dict) or info.get("id") in seen:continue
                 if requested_scene is not None:
                     try:
@@ -111,6 +120,9 @@ def discover(script,directory,urls=(),max_queries=3,max_clips=5,ydl_factory=None
                 for scene in matches:assignments.setdefault(str(scene["scene_id"]),[]).append(ident)
                 status.append({"video_id":info["id"],"status":"available","scene_ids":[s["scene_id"] for s in matches]})
                 if len(assets)>=max_clips:break
+            if requested_scene is not None:
+                status.append({"provider":"YouTube","query":query,"status":"searched",
+                  "candidate_count":candidate_count,"accepted_clips":len(assets)-count_before})
         except Exception as exc:
             status.append({"query":query,"status":"unavailable","reason":type(exc).__name__})
     report={"assets":assets,"scenes":assignments,"provider_status":status,

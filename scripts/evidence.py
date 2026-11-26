@@ -8,6 +8,10 @@ for root,names in ((work,["narration-metrics.json","progress.json","failure.json
         path=root/name
         if path.exists():
             print("COUNTRIES_REPORT "+json.dumps({"file":str(path),"data":json.loads(path.read_text())},ensure_ascii=False))
+path=output/"storyboard.json"
+if path.exists():
+    data=json.loads(path.read_text())
+    print("COUNTRIES_STORYBOARD "+json.dumps({k:data.get(k) for k in ("mode","model_error","repairs","scenes")},ensure_ascii=False))
 path=work/"media/media.json"
 if path.exists():
     data=json.loads(path.read_text())
