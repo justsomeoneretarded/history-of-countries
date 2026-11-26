@@ -4,9 +4,10 @@ import math
 import subprocess
 import numpy as np
 import cairocffi as cairo
-from PIL import Image,ImageOps,ImageFilter
+from PIL import Image,ImageOps,ImageFilter,ImageDraw
 from .core import PipelineError,ffmpeg,duration,key,save_json
 from .planning import VIDEO
+from .typography import font
 
 PROFILES={"cinematic":(1920,1080,30),"preview":(960,540,30)}
 
@@ -42,12 +43,22 @@ def render_image(asset,shot,path,profile):
         process=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=stderr)
         try:
             for index in range(frames):
-                zoom,pan=pose(index/max(1,frames-1),shot["motion"]);scale=base*zoom
+                progress=(shot.get("motion_offset_frames",0)+index)/max(1,shot.get("motion_total_frames",frames)-1)
+                zoom,pan=pose(progress,shot["motion"]);scale=base*zoom
                 context.set_source_surface(background,0,0);context.paint()
                 context.save()
                 context.translate((width-art.width*scale)/2+pan*width,(height-art.height*scale)/2)
                 context.scale(scale,scale);pattern=cairo.SurfacePattern(image);pattern.set_filter(cairo.FILTER_BILINEAR)
-                context.set_source(pattern);context.paint();context.restore();canvas.flush()
+                context.set_source(pattern);context.paint();context.restore()
+                year=str(shot.get("year_label","")).replace("\n"," ")
+                if year:
+                    context.save();context.select_font_face("DejaVu Sans",cairo.FONT_SLANT_NORMAL,cairo.FONT_WEIGHT_BOLD)
+                    size=max(7,round(width*.021));context.set_font_size(size)
+                    context.move_to(round(width*.035),round(height*.035)+size);context.text_path(year)
+                    context.set_line_join(cairo.LINE_JOIN_ROUND);context.set_line_width(max(1,width/640))
+                    context.set_source_rgba(.07,.13,.16,.85);context.stroke_preserve()
+                    context.set_source_rgb(1,1,1);context.fill();context.restore()
+                canvas.flush()
                 process.stdin.write(canvas.get_data())
             process.stdin.close()
             if process.wait(timeout=max(120,frames/fps*8)):raise PipelineError(errors.read_text()[-2000:])
@@ -58,16 +69,25 @@ def render_image(asset,shot,path,profile):
 
 def render_shot(asset,shot,directory,profile="cinematic"):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
-    identity=key("simple-shot-v1",asset["id"],asset.get("sha256",""),shot,profile)
+    identity=key("simple-shot-v2-baked-date",asset["id"],asset.get("sha256",""),shot,profile)
     output=directory/(identity+".mp4")
     expected=shot["frames"]/PROFILES[profile][2]
     if output.exists() and abs(duration(output)-expected)<.05:return output
     if asset.get("medium") in VIDEO:
         width,height,fps=PROFILES[profile]
         filters=f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=0x12232a,setsar=1,fps={fps},tpad=stop_mode=clone:stop_duration=0.04,format=yuv420p"
-        ffmpeg("-ss",str(shot.get("source_start",0)),"-i",asset["path"],"-vf",filters,
-          "-frames:v",str(shot["frames"]),"-an","-c:v","libx264","-preset","veryfast",
-          "-crf","19","-threads","2","-movflags","+faststart",output)
+        inputs=["-ss",str(shot.get("source_start",0)),"-i",asset["path"]]
+        year=str(shot.get("year_label","")).replace("\n"," ")
+        if year:
+            face=font(round(width*.021),True)
+            box=face.getbbox(year);label=Image.new("RGBA",(box[2]-box[0]+12,box[3]-box[1]+12))
+            draw=ImageDraw.Draw(label)
+            draw.text((6-box[0],6-box[1]),year,font=face,fill="white",stroke_width=max(1,round(width/900)),stroke_fill="#122129")
+            png=directory/(identity+"-date.png");label.save(png);inputs+=["-i",png]
+            video_filter=["-filter_complex",f"[0:v]{filters}[picture];[picture][1:v]overlay={round(width*.035)}:{round(height*.035)}:format=auto[v]","-map","[v]"]
+        else:video_filter=["-vf",filters]
+        ffmpeg(*inputs,*video_filter,"-frames:v",str(shot["frames"]),"-an","-c:v","libx264","-preset","veryfast",
+          "-crf","19","-pix_fmt","yuv420p","-threads","2","-movflags","+faststart",output)
     else:render_image(asset,shot,output,profile)
     if abs(duration(output)-expected)>.05:raise PipelineError("A visual shot did not preserve the frame duration")
     return output

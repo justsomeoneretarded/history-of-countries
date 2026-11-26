@@ -44,11 +44,12 @@ def render(script,speech,catalog,work,output,profile,api=None,full_script=None,r
     for name in ("music-credits.json","music-credits.txt","soundtrack.json"):
         shutil.copy2(directory/name,output/name)
     expected=sum(s["duration"] for s in speech["scenes"])
-    escaped=str((output/"years.ass").resolve()).replace(":","\\:").replace("'","\\'")
     final=output/"final.mp4"
-    ffmpeg("-i",silent,"-i",mixed,"-vf",f"ass=filename='{escaped}'","-af",filters,
-      "-map","0:v:0","-map","1:a:0","-t",str(expected),"-c:v","libx264","-preset","fast","-crf","18",
-      "-threads","2","-pix_fmt","yuv420p","-c:a","aac","-b:a","192k","-ar","48000","-movflags","+faststart",final,timeout=max(900,expected*6))
+    # Dates are already present in each visual part. Preserve the encoded
+    # picture instead of recompressing the entire film a second time.
+    ffmpeg("-i",silent,"-i",mixed,"-af",filters,
+      "-map","0:v:0","-map","1:a:0","-t",str(expected),"-c:v","copy",
+      "-c:a","aac","-b:a","192k","-ar","48000","-movflags","+faststart",final,timeout=max(900,expected*3))
     used={s["asset_id"] for s in shots}
     save_json(output/"render.json",{"style":"simple-archival-editor","duration":duration(final),"profile":profile,
       "voice":speech["voice"],"credits_seconds":0,"interlude_seconds":0})

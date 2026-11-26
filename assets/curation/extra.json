@@ -34,5 +34,40 @@
       "independence"
     ],
     "required_year": "1993"
+  },
+  {
+    "id": "abiy-2018-au",
+    "subject": "Abiy Ahmed at the African Union, November 2018",
+    "title": "Abiy Ahmed, 2018",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Abiy_Ahmed_at_the_African_Union_2018.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Abiy_Ahmed_at_the_African_Union_2018.jpg",
+    "creator": "Office of the Prime Minister of Ethiopia",
+    "license": "Public domain",
+    "license_url": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "medium": "historical_photo",
+    "date": "18 November 2018",
+    "context": "Identified portrait of Abiy Ahmed at the African Union in 2018. Use for the named prime minister, not as an image of a different leader or of the Tigray War.",
+    "required_terms": [
+      "abiy"
+    ],
+    "required_year": "2018"
+  },
+  {
+    "id": "pretoria-agreement-2022",
+    "subject": "The actual Pretoria cessation-of-hostilities agreement, 2 November 2022",
+    "title": "Pretoria Agreement, 2022",
+    "image_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/80/Pretoria_Agreement_%282022%29.pdf/page1-960px-Pretoria_Agreement_%282022%29.pdf.jpg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Pretoria_Agreement_(2022).pdf",
+    "creator": "Government of Ethiopia and Tigray People's Liberation Front",
+    "license": "Public domain",
+    "license_url": "https://commons.wikimedia.org/wiki/File:Pretoria_Agreement_(2022).pdf#Licensing",
+    "medium": "historical_document",
+    "date": "2 November 2022",
+    "context": "Raster view of the actual agreement's first page. It records the Pretoria cessation of hostilities; it is not a photograph of negotiators or a guarantee that all later disputes ended.",
+    "required_terms": [
+      "pretoria",
+      "agreement"
+    ],
+    "required_year": "2022"
   }
 ]

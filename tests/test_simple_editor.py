@@ -63,9 +63,9 @@ def test_actual_image_and_video_clips_encode_and_join_without_black_gaps(tmp_pat
     ffmpeg("-f","lavfi","-i","testsrc2=size=320x180:rate=30","-t","3","-an","-c:v","libx264","-pix_fmt","yuv420p",movie)
     directory=tmp_path/"shots"
     still=editing.render_shot({"id":"P","path":str(photo),"medium":"documentary_photo"},
-       {"frames":60,"motion":"left"} ,directory,"test")
+       {"frames":60,"motion":"left","year_label":"1896"} ,directory,"test")
     moving=editing.render_shot({"id":"V","path":str(movie),"medium":"video"},
-       {"frames":60,"motion":"in","source_start":.25},directory,"test")
+       {"frames":60,"motion":"in","source_start":.25,"year_label":"1935"},directory,"test")
     final=tmp_path/"joined.mp4";editing.concat([still,moving],final)
     assert duration(final)==pytest.approx(4,abs=.04)
     stream=next(s for s in probe(final)["streams"] if s["codec_type"]=="video")
@@ -82,3 +82,16 @@ def test_youtube_search_uses_the_reuse_filter_but_still_requires_result_license(
     assert query["search_query"]==["Ethiopia 1935 footage"]
     assert query["sp"]==["EgIwAQ=="]
     assert not youtube.reusable({"id":"tn2ehtuk1Gk","title":"creative commons footage"})
+
+
+def test_repeated_photo_holds_one_continuous_camera_across_edit_boundaries():
+    scene={"scene_id":1,"chapter":"Roots","narration":"The same subject continues.","date_label":"1900"}
+    speech={"scenes":[{"scene_id":1,"duration":12.0}]}
+    rows=planning.shots({"scenes":[scene]},speech,{"assets":[{"id":"A","medium":"historical_photo"}]},{"1":["A","A","A"]})
+    assert len(rows)==3
+    assert len({s["motion"] for s in rows})==1
+    frames=sum(s["frames"] for s in rows)
+    for previous,following in zip(rows,rows[1:]):
+        before=(previous["motion_offset_frames"]+previous["frames"]-1)/(frames-1)
+        after=following["motion_offset_frames"]/(frames-1)
+        assert after-before==pytest.approx(1/(frames-1))
