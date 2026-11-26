@@ -4,16 +4,43 @@ from pathlib import Path
 from PIL import Image,ImageDraw,ImageOps
 from .core import ROOT,PipelineError,read_json,save_json,key,ffmpeg
 
+def original_metadata(script):
+ ethiopia="ethiop" in script["title"].casefold()
+ return {"title":script["title"][:100],
+   "thumbnail_subject":"ETHIOPIA" if ethiopia else re.sub(r"^(?:The )?(?:Entire )?History of ","",script["title"],flags=re.I)[:40],
+   "thumbnail_hook":"WHY ITALY LOST" if ethiopia else "THE ENTIRE HISTORY",
+   "description":script.get("summary","")}
+
+def normalize_metadata(raw,script):
+ fields=("title","thumbnail_subject","thumbnail_hook","description")
+ if not isinstance(raw,dict) or any(not isinstance(raw.get(k),str) or not raw[k].strip() for k in fields):
+  raw=original_metadata(script)
+ result={k:raw[k].strip() for k in fields}
+ result["title"]=" ".join(result["title"].split())[:100]
+ result["thumbnail_subject"]=" ".join(result["thumbnail_subject"].split()[:4])[:40]
+ result["thumbnail_hook"]=" ".join(result["thumbnail_hook"].split()[:5])[:65]
+ result["description"]=result["description"][:1200]
+ return result
+
 class PackagingAPI:
  def __init__(self,api,script):self.api=api;self.script=script
  def text(self,*args,**kwargs):
   if self.api is not None:
-   try:return self.api.text(*args,**kwargs)
+   try:return normalize_metadata(self.api.text(*args,**kwargs),self.script)
    except PipelineError as exc:print("Metadata uses original script fields: "+str(exc),flush=True)
-  ethiopia="ethiop" in self.script["title"].casefold()
-  return {"title":self.script["title"][:100],"thumbnail_subject":"ETHIOPIA" if ethiopia else re.sub(r"^(?:The )?(?:Entire )?History of ","",self.script["title"],flags=re.I)[:40],
-   "thumbnail_hook":"WHY ITALY LOST" if ethiopia else "THE ENTIRE HISTORY",
-   "description":self.script.get("summary","")}
+  return normalize_metadata(original_metadata(self.script),self.script)
+
+def compact_attribution(assets):
+ """Group repeated author/license text; retain each work's title and source."""
+ groups={}
+ for asset in assets:
+  group=(asset.get("creator") or "Creator identified on source page",asset["license"],asset.get("license_url",""))
+  entry=(asset["subject"],asset["source_url"])
+  if entry not in groups.setdefault(group,[]):groups[group].append(entry)
+ return "\n\n".join(
+  creator+" — "+license+("\n"+url if url else "")+"\n"+
+  "\n".join(title+"\n"+source for title,source in works)
+  for (creator,license,url),works in groups.items())
 
 def package(api,script,speech,assets,output,work):
  api=PackagingAPI(api,script)
@@ -33,10 +60,12 @@ def package(api,script,speech,assets,output,work):
   metadata['thumbnail_subject']='ETHIOPIA'
   if re.search(r'\b(?:power|sovereignty|legacy|journey)\b',metadata['thumbnail_hook'],re.I):
    metadata['thumbnail_hook']='WHEN ITALY LOST'
+ metadata=normalize_metadata(metadata,source_script)
  metadata['fingerprint']=metadata_id;save_json(metadata_path,metadata)
  (output/'title.txt').write_text(metadata['title']+'\n')
  # Authentic large portrait/architecture: purposeful composition, no tiny icon collage.
- photos=[a for a in assets['assets'] if a.get('medium') not in ('video','archival_video')]
+ from .planning import VIDEO
+ photos=[a for a in assets['assets'] if a.get('medium') not in VIDEO]
  subjects=sorted(photos,key=lambda a:('menelik' not in a.get('subject','').lower(), 'adwa' not in a.get('subject','').lower()))
  im=Image.new('RGB',(1280,720),'#102934')
  if subjects:
@@ -77,12 +106,30 @@ def package(api,script,speech,assets,output,work):
  music=(output/'music-credits.txt').read_text() if (output/'music-credits.txt').exists() else ''
  full=text+'\nSOURCES\n'+evidence+'\n\nHISTORICAL MEDIA\n'+credits+'\n\nMUSIC\n'+music
  (output/'sources-and-credits.txt').write_text(full)
- # Attribution must remain accessible in upload metadata; no in-frame credit clutter.
+ # Attribution stays in the description; repeated author/license headers are
+ # shared across works, with every work title and source URL preserved.
+ required=[a for a in assets["assets"] if not any(x in a["license"].casefold() for x in ("public domain","cc0"))]
+ changes="Historical images cropped, resized and panned; original media licenses apply."
+ attribution=compact_attribution(required)
  description=full
+ compacted=False;reference_links=True
  if len(description)>4900:
-  # PD/CC0 attribution is retained in full delivery credits; preserve required CC BY attribution in upload metadata.
-  required=[a for a in assets['assets'] if not any(x in a['license'].casefold() for x in ['public domain','cc0'])]
-  compact='\n\n'.join(f'{a["subject"]} — {a.get("creator","Historical archive")} — {a["license"]}\n{a["source_url"]}\n{a.get("license_url","")}' for a in required)
-  description=text+'\nSOURCES\n'+'\n'.join(s['url'] for s in sources['sources'])+'\n\nVISUAL ATTRIBUTION\n'+compact+'\n\nMUSIC\n'+music
- if len(description)>4900:raise PipelineError('Required attribution exceeds YouTube description budget; reduce used CC BY assets')
- (output/'description.txt').write_text(description)
+  compacted=True
+  description=text+"\nSOURCES\n"+"\n".join(s["url"] for s in sources["sources"])+"\n\nVISUAL ATTRIBUTION\n"+changes+"\n"+attribution+"\n\nMUSIC\n"+music
+ if len(description)>4900:
+  # Factual reference links remain in the complete companion credits file.
+  # Required image and music credits have priority in limited upload metadata.
+  reference_links=False
+  intro=metadata["description"][:240]+"\n\n"+"\n".join(chapters)+"\n"
+  description=intro+"\nVISUAL ATTRIBUTION\n"+changes+"\n"+attribution+"\n\nMUSIC\n"+music
+ if len(description)>4900:
+  raise PipelineError(f"Required attribution is {len(description)} characters after grouping; YouTube allows 5000. Reduce distinct licensed works.")
+ (output/"description.txt").write_text(description)
+ checks={"passed":True,"title_characters":len(metadata["title"]),
+   "description_characters":len(description),"description_budget":4900,
+   "thumbnail_bytes":(output/"thumbnail.jpg").stat().st_size,
+   "required_visual_attributions":len(required),"grouped_credits":compacted,
+   "reference_links_in_description":reference_links,
+   "complete_credits_file":"sources-and-credits.txt"}
+ if checks["thumbnail_bytes"]>=2_000_000:raise PipelineError("Thumbnail exceeds YouTube's 2 MB limit")
+ save_json(output/"package-checks.json",checks)
