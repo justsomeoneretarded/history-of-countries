@@ -1,0 +1,56 @@
+{
+  "episode": "The Entire History of Ethiopia",
+  "validated_code_commit": "3d07013cce4337b8bad5d6926d08a70b6be1e82a",
+  "production_run": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/45815732315",
+  "artifact": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/45815732315/artifacts/15114947848",
+  "ci_run": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/45815732284",
+  "tests_passed": 77,
+  "delivery": {
+    "upload_ready": true,
+    "preview": false,
+    "duration_seconds": 508.63999999999993,
+    "voice": "Charon",
+    "technical_passed": true,
+    "visual_style": "Real photographs and licensed footage, smooth image motion and clean cuts",
+    "youtube_published": false,
+    "quality_scope": "Encoded-media, timing, speech-verification and provenance checks; no animation-score approval stage"
+  },
+  "video": {
+    "duration_seconds": 508.64,
+    "width": 1920,
+    "height": 1080,
+    "frame_rate": "30/1",
+    "codec": "h264"
+  },
+  "audio": {
+    "voice": "Charon",
+    "codec": "aac",
+    "sample_rate": "48000",
+    "channels": 2,
+    "lufs": -16.05,
+    "true_peak_dbfs": -1.66,
+    "speech_coverage_min": 0.9459459459459459,
+    "speech_precision_min": 0.9427609427609428
+  },
+  "no_black_intervals": true,
+  "media": {
+    "images": 41,
+    "footage_excerpts": 2,
+    "youtube_excerpts": 0,
+    "distinct_source_urls": 42,
+    "planning_mode": "Gemini_spoken_cue_media_order"
+  },
+  "packaging": {
+    "passed": true,
+    "title_characters": 60,
+    "description_characters": 4351,
+    "description_budget": 4900,
+    "thumbnail_bytes": 179049,
+    "required_visual_attributions": 17,
+    "grouped_credits": true,
+    "reference_links_in_description": true,
+    "complete_credits_file": "sources-and-credits.txt"
+  },
+  "secret_name": "gemini_api_key",
+  "quality_scope": "Encoded-media, timing, speech-verification and provenance checks; no animation-score approval stage"
+}
