@@ -1,6 +1,7 @@
 """Relevant archive selection, Commons discovery and optional YouTube excerpts."""
 from pathlib import Path
 import html
+import hashlib
 import re
 import time
 import requests
@@ -87,6 +88,8 @@ def build(script,directory,use_youtube=True,youtube_urls=(),fetch=True):
         if use_youtube:_merge(result,youtube.bounded(script,directory/"youtube",youtube_urls))
     # Every spoken scene must have real relevant media. No generated placeholder.
     missing=[s["scene_id"] for s in script["scenes"] if not result["scenes"].get(str(s["scene_id"]))]
+    for asset in result["assets"]:
+        asset["sha256"]=hashlib.sha256(Path(asset["path"]).read_bytes()).hexdigest()
     save_json(directory/"media.json",result)
     if missing:raise PipelineError("No relevant reusable media for scenes "+", ".join(map(str,missing))+". See work/media/media.json; add licensed URLs or refine those searches.")
     return result
