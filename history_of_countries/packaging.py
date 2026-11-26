@@ -1,5 +1,6 @@
 """YouTube metadata and a readable, authentic-image thumbnail."""
 import math,os,re
+from pathlib import Path
 from PIL import Image,ImageDraw,ImageOps
 from .core import ROOT,PipelineError,read_json,save_json,key,ffmpeg
 
