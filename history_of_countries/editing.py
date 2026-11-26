@@ -13,7 +13,7 @@ PROFILES={"cinematic":(1920,1080,30),"preview":(960,540,30)}
 def pose(progress,motion):
     p=max(0.,min(1.,float(progress)));u=p*p*(3-2*p)
     zoom=1.045-.045*u if motion=="out" else 1.+.045*u if motion=="in" else 1.045
-    pan=(-1 if motion=="left" else 1)*(.5-u)*.035 if motion in {"left","right"} else 0.
+    pan=(1 if motion=="left" else -1)*(.5-u)*.035 if motion in {"left","right"} else 0.
     return zoom,pan
 
 def _surface(image):
