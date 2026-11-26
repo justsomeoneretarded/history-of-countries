@@ -35,8 +35,11 @@ def restore():
     import shutil
     source=Path("work/restore");destination=Path("work/countries")
     destination.mkdir(parents=True,exist_ok=True)
-    for name in ("script.json","script.txt","research.json","request.json","style-profile.json",
-      "writing-metrics.json","narration-metrics.json","directed-packaging.json","speech","director-chapters","voice-auditions"):
+    names=["script.json","script.txt","research.json","request.json","style-profile.json",
+      "writing-metrics.json","narration-metrics.json","directed-packaging.json","speech","director-chapters","voice-auditions"]
+    if os.getenv("RESUME_ARTIFACT")=="countries-checkpoint":
+        names+=["gemini","media","simple-render","storyboard.json"]
+    for name in names:
         path=source/name
         if path.is_dir():shutil.copytree(path,destination/name,dirs_exist_ok=True)
         elif path.is_file():shutil.copy2(path,destination/name)

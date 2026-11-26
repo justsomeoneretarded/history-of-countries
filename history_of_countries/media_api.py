@@ -16,7 +16,7 @@ class MediaAPI:
  def __init__(self,directory,session=None,clock=time.time,sleeper=time.sleep):
   self.directory=Path(directory);self.directory.mkdir(parents=True,exist_ok=True)
   self.secret=os.getenv('GEMINI_API') or os.getenv('GEMINI_API_KEY')
-  if not self.secret and session is None:raise PipelineError('Missing GEMINI_API secret')
+  if not self.secret and session is None:raise PipelineError('Missing GEMINI_API_KEY (Actions secret: gemini_api_key)')
   self.session=session or requests.Session();self.use_sdk=session is None;self.clock=clock;self.sleeper=sleeper
   self.ledger=Path(os.getenv('GEMINI_MEDIA_LEDGER',str(self.directory/'usage.json')))
   self.interval=max(65,float(os.getenv('GEMINI_INTERVAL_SECONDS','65')))

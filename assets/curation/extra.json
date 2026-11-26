@@ -1,0 +1,38 @@
+[
+  {
+    "id": "eritrea-flag-1993",
+    "subject": "Eritrea's national flag, 1993–1995",
+    "title": "Flag of Eritrea, 1993–1995",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/86/Bandera_de_Eritrea_de_1993.png",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Bandera_de_Eritrea_de_1993.png",
+    "creator": "Pedro S. Vivono",
+    "license": "Public domain",
+    "license_url": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "medium": "historical_artwork",
+    "date": "1993–1995 design; digital illustration created in 2008",
+    "context": "Illustration of the flag used after independence. This is a political symbol, not a photograph or film of the referendum.",
+    "required_terms": [
+      "eritrea",
+      "independence"
+    ],
+    "required_year": "1993"
+  },
+  {
+    "id": "eritrea-territory-1993",
+    "subject": "Eritrea's territory in 1993",
+    "title": "Eritrea territorial reference, 1993",
+    "image_url": "https://upload.wikimedia.org/wikipedia/commons/3/3d/BlankMap-Eritrea2.92.png",
+    "source_url": "https://commons.wikimedia.org/wiki/File:BlankMap-Eritrea2.92.png",
+    "creator": "Shinas",
+    "license": "Public domain",
+    "license_url": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "medium": "cartographic_image",
+    "date": "1993 territory; cartographic illustration created in 2007",
+    "context": "A later-drawn territorial reference for Eritrea in 1993. Use to explain separation and geography, not as contemporary event footage.",
+    "required_terms": [
+      "eritrea",
+      "independence"
+    ],
+    "required_year": "1993"
+  }
+]
