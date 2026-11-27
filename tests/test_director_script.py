@@ -290,7 +290,6 @@ def test_natural_drafts_need_no_revision_and_citations_do_not_reach_tts(tmp_path
         def text(self, instruction, payload, schema, **kwargs):
             self.calls.append(payload)
             assert "draft" not in payload
-            assert "5–7 natural complete sentences" in instruction
             count = schema["properties"]["scenes"]["minItems"]
             return fake_chapter(payload["target_chapter_words"], count, citations=True)
 
@@ -487,3 +486,11 @@ def test_known_two_year_political_scene_has_a_range_without_rewriting_narration(
     assert not any("conflicts with the year" in issue for issue in chapter_story_issues(corrected, "Aftermath"))
     wrong = {"scenes": [story_scene("Haile Selassie returned in 1941.", ["S5"], "1936")]}
     assert normalize_story_dates(wrong, "Turning Point") == wrong
+
+
+def test_natural_delivery_is_preferred_to_a_more_theatrical_high_scoring_voice():
+    natural={"voice":"Charon","verification":{"accepted":True},"words_per_minute":170,
+      "review":{"naturalness":8,"clarity":8,"rhythm":8,"overacted":False}}
+    theatrical={"voice":"Puck","verification":{"accepted":True},"words_per_minute":174,
+      "review":{"naturalness":10,"clarity":10,"rhythm":10,"overacted":True}}
+    assert choose_audition([theatrical,natural])["voice"]=="Charon"

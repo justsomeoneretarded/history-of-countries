@@ -707,7 +707,9 @@ def choose_audition(candidates):
             return -1000
         pace_penalty = abs(c["words_per_minute"] - 174) / 20
         return review["naturalness"] * 2 + review["clarity"] + review["rhythm"] - pace_penalty - (4 if review["overacted"] else 0)
-    return max(candidates, key=score)
+    verified=[c for c in candidates if c["verification"]["accepted"]]
+    natural=[c for c in verified if not c["review"].get("overacted") and c["review"].get("naturalness",0)>=7 and c["review"].get("clarity",0)>=7]
+    return max(natural or verified or candidates, key=score)
 
 
 def audition(api, script, directory):
