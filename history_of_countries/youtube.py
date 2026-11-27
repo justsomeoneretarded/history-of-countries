@@ -98,7 +98,7 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
                  "elapsed_seconds":round(time.monotonic()-started,1),
                  "uncovered_scene_ids":[str(s["scene_id"]) for s in script["scenes"] if not assignments.get(str(s["scene_id"]))],
                  "error_counts":dict(Counter(row.get("reason","") for row in status if row.get("status")=="unavailable"))}
-        result={"version":VERSION,"assets":assets,"scenes":assignments,"provider_status":status,"summary":summary,
+        result={"version":VERSION,"script_fingerprint":key(script),"assets":assets,"scenes":assignments,"provider_status":status,"summary":summary,
                 "inspection_reports":reviews,
                 "note":"Only explicit reusable rights plus actual Gemini video inspection qualify a clip. Missing footage remains visible; no login or DRM bypass."}
         save_json(directory/"discovery.json",result)
@@ -230,6 +230,9 @@ def bounded(script,directory,urls=(),timeout=None):
     import signal,subprocess,sys
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
     request=directory/"request.json";save_json(request,{"script":script,"urls":list(urls)})
+    # A failed new attempt must never publish an old country/script discovery.
+    save_json(directory/"discovery.json",{"version":VERSION,"script_fingerprint":key(script),
+              "assets":[],"scenes":{},"provider_status":[]})
     timeout=timeout or Limits.environment().total_seconds+120
     process=subprocess.Popen([sys.executable,"-m","history_of_countries.youtube","--request",str(request),"--output",str(directory)],
                              start_new_session=True)

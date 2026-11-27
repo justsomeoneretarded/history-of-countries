@@ -182,3 +182,18 @@ def test_historical_recording_date_is_distinct_from_upload_and_remaster_year():
     assert not youtube.related(info,{**passage,"date_label":"1896"})
     info["title"]="Ethiopian cavalry 1941 remastered 2024"
     assert search.dated_event_evidence(info)=={1941}
+
+
+def test_failed_discovery_process_cannot_reuse_footage_from_another_script(tmp_path,monkeypatch):
+    import subprocess
+    from history_of_countries.core import save_json,key
+    save_json(tmp_path/"discovery.json",{"assets":[{"id":"old-country"}],"scenes":{"1":["old-country"]},"provider_status":[]})
+    class Failed:
+        def __init__(self,*a,**k):pass
+        def wait(self,*a,**k):return 1
+    monkeypatch.setattr(subprocess,"Popen",Failed)
+    script={"title":"Ethiopia","scenes":[scene()]}
+    result=youtube.bounded(script,tmp_path,timeout=1)
+    assert result["assets"]==[]
+    assert result["script_fingerprint"]==key(script)
+    assert result["provider_status"][-1]["reason"]=="extractor_process_failed"
