@@ -1,56 +1,122 @@
 {
   "episode": "The Entire History of Ethiopia",
-  "validated_code_commit": "3d07013cce4337b8bad5d6926d08a70b6be1e82a",
-  "production_run": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/45815732315",
-  "artifact": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/45815732315/artifacts/15114947848",
-  "ci_run": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/45815732284",
-  "tests_passed": 77,
+  "date": "2026-11-27",
+  "validated_production_commit": "c091e3c11c3e63b4ceca35dcfdd516c3d595b9e5",
+  "production_run": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46054314537",
+  "artifact": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46054314537/artifacts/15226312314",
+  "ci_run": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46054314532",
+  "tests_passed": 91,
   "delivery": {
     "upload_ready": true,
     "preview": false,
-    "duration_seconds": 508.63999999999993,
+    "duration_seconds": 542.0200000000001,
     "voice": "Charon",
     "technical_passed": true,
-    "visual_style": "Real photographs and licensed footage, smooth image motion and clean cuts",
+    "visual_style": "Complete historical images and real footage, phrase-aligned cuts, discreet dates and no animation",
+    "source_crop": false,
+    "image_animation": false,
+    "outro_seconds": 1.2,
     "youtube_published": false,
     "quality_scope": "Encoded-media, timing, speech-verification and provenance checks; no animation-score approval stage"
   },
+  "story": {
+    "words": 1488,
+    "chapters": 5,
+    "scenes": 24,
+    "opening": "Before dawn at Adwa, General Baratieri sends his soldiers into the Ethiopian hills. His Italian columns are supposed to support each other. Instead, they lose contact. One force becomes several isolated targets. By the time the mistake is clear, Emperor Menelik's army is closing in. Italy expected a colonial victory. It is about to suffer a catastrophe.",
+    "ending": "An African Union-brokered agreement in Pretoria brought a cessation of hostilities in November twenty twenty-two. It was a crucial opening, not a promise that every grievance had been settled. At Adwa, Ethiopia's leaders had built unity against an invader. The harder task was making that unity work when the enemy was no longer outside the border. Survival could be won on a battlefield. Sharing a country required something the battlefield could never decide.",
+    "manual_fact_approval_required": false
+  },
   "video": {
-    "duration_seconds": 508.64,
+    "duration_seconds": 542.033333,
     "width": 1920,
     "height": 1080,
     "frame_rate": "30/1",
-    "codec": "h264"
+    "codec": "h264",
+    "source_crop": false,
+    "image_animation": false,
+    "shots": 126
   },
   "audio": {
     "voice": "Charon",
+    "narration_seconds": 540.82,
+    "words_per_minute": 165.08265226877703,
     "codec": "aac",
     "sample_rate": "48000",
     "channels": 2,
     "lufs": -16.05,
-    "true_peak_dbfs": -1.66,
-    "speech_coverage_min": 0.9459459459459459,
-    "speech_precision_min": 0.9427609427609428
+    "true_peak_dbfs": -2.56,
+    "speech_coverage_min": 0.9468085106382979,
+    "speech_precision_min": 0.9391534391534392,
+    "time_stretch_applied": false,
+    "listening": {
+      "assessed": true,
+      "review": {
+        "naturalness": 8,
+        "clarity": 9,
+        "rhythm": 8,
+        "overacted": false,
+        "observations": [
+          "The speaker maintains a steady, engaging pace throughout the segments.",
+          "Articulation is generally clear and easy to follow.",
+          "The voice quality is clean with minimal artifacts."
+        ],
+        "issues": [
+          "Slightly mechanical cadence in a few places.",
+          "Minor variation in room tone across joined excerpts."
+        ]
+      },
+      "model_error": null,
+      "fingerprint": "df18dc402a0e189452582989",
+      "scope": "Sampled actual final AAC soundtrack; no historical review",
+      "sections": [
+        {
+          "start": 0,
+          "seconds": 35
+        },
+        {
+          "start": 261.0166665,
+          "seconds": 20
+        },
+        {
+          "start": 515.033333,
+          "seconds": 27
+        }
+      ],
+      "audio_file": "listening-sample.wav"
+    }
   },
-  "no_black_intervals": true,
   "media": {
-    "images": 41,
-    "footage_excerpts": 2,
+    "images": 45,
+    "footage_excerpts": 1,
     "youtube_excerpts": 0,
-    "distinct_source_urls": 42,
-    "planning_mode": "Gemini_spoken_cue_media_order"
+    "distinct_source_urls": 46
   },
   "packaging": {
     "passed": true,
-    "title_characters": 60,
-    "description_characters": 4351,
+    "title_characters": 74,
+    "description_characters": 4870,
     "description_budget": 4900,
-    "thumbnail_bytes": 179049,
-    "required_visual_attributions": 17,
+    "thumbnail_bytes": 178467,
+    "required_visual_attributions": 19,
     "grouped_credits": true,
     "reference_links_in_description": true,
     "complete_credits_file": "sources-and-credits.txt"
   },
-  "secret_name": "gemini_api_key",
+  "no_black_intervals": true,
+  "quota": {
+    "primary_daily_free_limit_observed": 10,
+    "primary_model": "gemini-3.8-flash-tts",
+    "supported_free_recovery_model": "gemini-3.8-flash-lite-tts",
+    "accepted_chapters_preserved": true
+  },
+  "comparison": {
+    "previous_script_words": 1430,
+    "previous_narration_seconds": 508.64,
+    "new_script_words": 1488,
+    "new_narration_seconds": 540.82,
+    "previous_images": "Pans/zooms and some cover framing",
+    "current_images": "Whole original source images, proportionally contained; no image animation"
+  },
   "quality_scope": "Encoded-media, timing, speech-verification and provenance checks; no animation-score approval stage"
 }

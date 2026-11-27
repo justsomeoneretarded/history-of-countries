@@ -73,7 +73,15 @@ A full export is 1920×1080 at 30 fps, H.264 video and AAC stereo audio. Deliver
 
 The test suite currently passes 91 checks. Tests encode and inspect actual media using synthetic fixtures. They verify transport and editing contracts, not human pronunciation or audience retention. Real productions also record speech-completeness measurements, actual voice comparisons and sampled listening observations.
 
-The previous validated Ethiopia edition is recorded in VALIDATION.json. The new story, voice and complete-image refinement is being produced and will have its own measured delivery record.
+The refined Ethiopia edition completed successfully on **27 November 2026**: **9:02, 1920×1080 at 30 fps, Charon narration**, and a 1,488-word original story. All **91 tests** and full output checks passed.
+
+- [Download the refined video, upload files and voice-comparison samples](https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46054314537/artifacts/15226312314).
+- [Inspect the successful full production](https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46054314537).
+- [Run another video](https://github.com/justsomeoneretarded/history-of-countries/actions/workflows/video.yml).
+
+The export contains 126 phrase-aligned cuts, whole source images with no artificial camera motion, 45 image sources and one archive-video excerpt. No YouTube clip was selected. The final AAC soundtrack measured −16.05 LUFS and −2.56 dBTP, with no detected black gaps. The 74-character title, 4,870-character description and thumbnail passed upload-package limits.
+
+Gemini listened to actual opening, middle and ending excerpts: naturalness 8/10, clarity 9/10, rhythm 8/10, with no overacting. It noted occasional mechanical cadence and minor room-tone variation. These are model observations on sampled audio, not a claim of perfect speech or audience retention. Measured reports are recorded in [VALIDATION.json](VALIDATION.json).
 
 For local use:
 
