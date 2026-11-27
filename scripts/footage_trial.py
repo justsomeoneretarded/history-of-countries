@@ -74,6 +74,11 @@ def print_evidence(report):
         {k:a.get(k) for k in ("id","subject","title","source_url","source_start_seconds","source_end_seconds",
                               "duration_seconds","width","height","footage_presentation","inspection_mode","inspection")}
         for a in report.get("assets",[])],ensure_ascii=False),flush=True)
+    reviewed={r.get("source_id") for r in report.get("inspection_reports",[])}
+    for path in sorted(Path("work/footage/media/youtube/metadata").glob("*.json")):
+        item=read_json(path).get("info",{})
+        if item.get("id") in reviewed:
+            print("FOOTAGE_REVIEWED_METADATA "+json.dumps({k:item.get(k) for k in ("id","title","description","duration","license","uploader","upload_date")},ensure_ascii=False),flush=True)
     print("FOOTAGE_PROVIDER_FAILURES "+json.dumps([
         row for row in report.get("provider_status",[]) if row.get("status") in {"unavailable","skipped"}],ensure_ascii=False),flush=True)
 
