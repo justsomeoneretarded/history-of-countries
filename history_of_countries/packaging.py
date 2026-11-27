@@ -109,7 +109,7 @@ def package(api,script,speech,assets,output,work):
  # Attribution stays in the description; repeated author/license headers are
  # shared across works, with every work title and source URL preserved.
  required=[a for a in assets["assets"] if not any(x in a["license"].casefold() for x in ("public domain","cc0"))]
- changes="Historical images cropped, resized and panned; original media licenses apply."
+ changes="Historical images resized without cropping; original media licenses apply."
  attribution=compact_attribution(required)
  description=full
  compacted=False;reference_links=True
