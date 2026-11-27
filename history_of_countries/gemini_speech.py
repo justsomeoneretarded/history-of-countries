@@ -9,7 +9,7 @@ from .speech_verify import speech_check
 
 def produce(api,script,voice,directory):
  directory.mkdir(parents=True,exist_ok=True)
- identity=key('gemini-speech-v2',script,voice,os.getenv('GEMINI_TTS_MODEL','gemini-3.8-flash-tts'),os.getenv('GEMINI_SPEECH_STYLE','default'))
+ identity=key('gemini-speech-v3-mastered',script,voice,os.getenv('GEMINI_TTS_MODEL','gemini-3.8-flash-tts'),os.getenv('GEMINI_SPEECH_STYLE','default'))
  index=directory/'speech.json'
  if index.exists():
   old=read_json(index)
@@ -34,13 +34,15 @@ def produce(api,script,voice,directory):
    aligned=align_written(text,heard)
    record={'words':aligned,'duration':duration(audio),'verification':check,'generation_seconds':round(time.monotonic()-started,2),**meta}
    save_json(checkpoint,record)
-  # Crop only between consecutive aligned words, preserving all speech.
+  from .narration_audio import master
+  mastered,mastering=master(audio,directory/"masters")
+  # Split only at natural inter-word boundaries; keep the original recording too.
   cursor=0;start=0
   for i,scene in enumerate(scenes):
    count=len(scene['narration'].split());endword=cursor+count
    end=(record['words'][endword-1]['end']+record['words'][endword]['start'])/2 if i<len(scenes)-1 else record['duration']
    target=directory/f'scene-{scene["scene_id"]}-{signature}.wav'
-   if not target.exists():ffmpeg('-ss',str(start),'-i',audio,'-t',str(end-start),'-ar','24000','-ac','1','-c:a','pcm_s16le',target)
+   if not target.exists():ffmpeg('-ss',str(start),'-i',mastered,'-t',str(end-start),'-ar','24000','-ac','1','-c:a','pcm_s16le',target)
    words=[{**w,'start':max(0,w['start']-start),'end':min(end-start,max(.02,w['end']-start))} for w in record['words'][cursor:endword]]
    results.append({'scene_id':scene['scene_id'],'audio':target.name,'duration':duration(target),'words':words,'captions':caption_groups(words),'verification':record['verification'],'generation_seconds':record['generation_seconds'],'provider':'Gemini','model':record['model']})
    start=end;cursor=endword

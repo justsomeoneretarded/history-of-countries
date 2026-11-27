@@ -11,18 +11,19 @@ from . import director_script,bootstrap,media,planning,editing,packaging,quality
 from .audio_edit import mix
 from .director_sound import compose
 
-DEFAULT_BRIEF="Tell an original, conversational story of how Ethiopia built powerful kingdoms, resisted foreign conquest, and struggled over power at home. Connect Aksum and the medieval highlands to Menelik, Taytu, Adwa, the 1935 invasion, restoration, revolution, and the November 2022 Pretoria agreement. Use concrete choices and consequences. Match Jerusalem's natural narration and approximate length, and Pig War's varied explanatory acting. No channel branding, copied jokes, fabricated dialogue, or additional manual fact-review stage."
+DEFAULT_BRIEF="Tell an original, absorbing history of Ethiopia from Aksum through the November 2022 Pretoria agreement. Begin inside the Adwa reversal, connect centuries through decisions and consequences, and pay off the opening question at the end. Conversational, clear, lightly ironic about rulers' mistakes, sober about suffering. Real historical photographs and footage only. Preserve complete source images, prefer widescreen compositions, use minimal on-screen dates and no animated graphics."
 
 def validate_request(raw):
     if not isinstance(raw,dict):raise PipelineError("Request must be an object")
-    request={"title":"The Entire History of Ethiopia","brief":DEFAULT_BRIEF,"voice":"Charon","minutes":8.75,"youtube":True,"youtube_urls":[],"phase":"full",**raw}
+    request={"title":"The Entire History of Ethiopia","brief":DEFAULT_BRIEF,"voice":"Charon","minutes":8.75,"youtube":True,"youtube_urls":[],"phase":"full","editorial_draft":None,**raw}
     if not isinstance(request["title"],str) or not 1<=len(request["title"].strip())<=200:raise PipelineError("Supply a title of 1–200 characters")
     if not isinstance(request["brief"],str) or not 1<=len(request["brief"].strip())<=6000:raise PipelineError("Supply a brief of 1–6000 characters")
     if request["voice"] not in (*VOICES,"auto"):raise PipelineError("Choose a supported Gemini voice")
     if type(request["minutes"]) not in (int,float) or not .5<=request["minutes"]<=10:raise PipelineError("Choose 0.5–10 minutes")
     if type(request["youtube"]) is not bool:raise PipelineError("youtube must be true or false")
-    if request["phase"] not in {"full","preview"}:raise PipelineError("Choose full or preview")
+    if request["phase"] not in {"full","preview","voice"}:raise PipelineError("Choose full or preview")
     if not isinstance(request["youtube_urls"],list) or len(request["youtube_urls"])>8:raise PipelineError("Supply at most eight YouTube URLs")
+    if request["editorial_draft"] not in {None,"ethiopia"}:raise PipelineError("Unknown editorial draft")
     for url in request["youtube_urls"]:media.youtube.video_id(url)
     return request
 
@@ -80,14 +81,25 @@ def run(request,work,output):
     os.environ.setdefault("GEMINI_PACKAGE_MODEL","gemini-3.5-flash-lite")
     os.environ.setdefault("GEMINI_INPUT_TOKEN_BUDGET","40000")
     os.environ.setdefault("SCRIPT_TARGET_WPM","160")
+    draft_args=["--draft",request["editorial_draft"]] if request["editorial_draft"] else []
     code=director_script.main(["--stage","all","--title",request["title"],"--brief",request["brief"],
-      "--voice",request["voice"],"--minutes",str(request["minutes"]),"--work",str(work)])
+      "--voice",request["voice"],"--minutes",str(request["minutes"]),"--work",str(work),*draft_args])
     if code:
         if code==75:raise QuotaDeferred("Gemini free quota deferred; resume the saved countries-checkpoint after the quota reset")
         raise PipelineError("Writing or narration failed; see checkpoint failure.json")
     script=read_json(work/"script.json");speech=read_json(work/"speech/speech.json")
     if {str(s["scene_id"]) for s in speech["scenes"]}!={str(s["scene_id"]) for s in script["scenes"]}:raise PipelineError("Speech/script scene IDs do not match")
     if any(s.get("verification",{}).get("accepted") is not True for s in speech["scenes"]):raise PipelineError("Unverified narration cannot be exported")
+    audition=work/"voice-auditions/audition.json"
+    if audition.exists():
+        shutil.copy2(audition,output/"voice-comparison.json")
+        for source in (work/"voice-auditions").glob("*.wav"):
+            target=output/"voice-samples"/source.name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,target)
+    if request["phase"]=="voice":
+        save_json(output/"delivery.json",{"upload_ready":False,"stage":"narration","voice":speech["voice"],"duration_seconds":sum(s["duration"] for s in speech["scenes"])})
+        save_json(work/"progress.json",{"complete":True,"stage":"narration"})
+        shutil.copy2(work/"script.txt",output/"script.txt")
+        return work/"speech/speech.json"
     if request["phase"]=="preview":
         selected={s["scene_id"] for s in script["scenes"][:3]}
         script={**script,"scenes":[s for s in script["scenes"] if s["scene_id"] in selected]}

@@ -1,0 +1,371 @@
+{
+  "title": "The Entire History of Ethiopia",
+  "summary": "How Ethiopia's rulers built unity against foreign conquest while struggling over power inside the state.",
+  "scenes": [
+    {
+      "scene_id": 1,
+      "chapter": "Hook",
+      "date_label": "March 1896",
+      "asset_search_term": "Oreste Baratieri Adwa portrait",
+      "location": "Adwa",
+      "source_ids": [
+        "S4"
+      ],
+      "narration": "Before dawn at Adwa, General Baratieri sends his soldiers into the Ethiopian hills. His Italian columns are supposed to support each other. Instead, they lose contact. One force becomes several isolated targets. By the time the mistake is clear, Emperor Menelik's army is closing in. Italy expected a colonial victory. It is about to suffer a catastrophe.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 2,
+      "chapter": "Hook",
+      "date_label": "March 1896",
+      "asset_search_term": "Battle of Adwa painting",
+      "location": "Adwa",
+      "source_ids": [
+        "S3",
+        "S4"
+      ],
+      "narration": "The surprise isn't that Ethiopians fought back. It's that Menelik brought enough rivals together to win. That achievement would become a national symbol. It would not make those rivalries disappear. To understand both the victory and the arguments that followed, we have to go back almost two thousand years, to a kingdom built on trade.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 3,
+      "chapter": "Roots",
+      "date_label": "100–350 AD",
+      "asset_search_term": "Aksum ancient coins Red Sea",
+      "location": "Aksum",
+      "source_ids": [
+        "S1"
+      ],
+      "narration": "Aksum grew where the African highlands met routes to the Red Sea. Merchants carried goods between the interior, Arabia, and the wider Indian Ocean world. Rulers collected wealth from that movement. By the third century, they were minting coins of their own. A coin could travel farther than a royal messenger. It carried the king's authority into somebody else's market.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "resolute"
+    },
+    {
+      "scene_id": 4,
+      "chapter": "Roots",
+      "date_label": "340 AD",
+      "asset_search_term": "King Ezana Aksum coin Christianity",
+      "location": "Aksum",
+      "source_ids": [
+        "S1"
+      ],
+      "narration": "Then King Ezana adopted Christianity, in the fourth century. The change connected Aksum to other Christian powers and gave its monarchy a lasting religious identity. Kings could claim more than control of roads and armies. Their rule had a sacred purpose. This connection between faith and the crown would survive long after Aksum stopped being the region's dominant trading power.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "resolute"
+    },
+    {
+      "scene_id": 5,
+      "chapter": "Roots",
+      "date_label": "12th Century",
+      "asset_search_term": "Lalibela rock hewn churches",
+      "location": "Lalibela",
+      "source_ids": [
+        "S1",
+        "S2"
+      ],
+      "narration": "But trade routes change. Aksum's influence declined, and political life shifted deeper into the highlands. Under the Zagwe dynasty, churches were cut into the rock at Lalibela. These were places of worship, built on an extraordinary scale. They also made royal ambition visible. A ruler who couldn't command an overseas trading network could still build something people would come from far away to see.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "resolute"
+    },
+    {
+      "scene_id": 6,
+      "chapter": "Roots",
+      "date_label": "1270 AD",
+      "asset_search_term": "Ethiopian medieval manuscript",
+      "location": "Ethiopian Highlands",
+      "source_ids": [
+        "S2"
+      ],
+      "narration": "In twelve seventy, Yekuno Amlak overthrew the Zagwe. Winning power was one problem. Explaining why he deserved it was another. The dynasty that followed claimed descent from King Solomon and the Queen of Sheba. That was a claim about legitimacy, not a family tree historians can simply verify. It placed the monarchy inside a sacred story stretching far beyond the highlands.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "resolute"
+    },
+    {
+      "scene_id": 7,
+      "chapter": "Roots",
+      "date_label": "1543 AD",
+      "asset_search_term": "Ethiopian highlands Adal Portuguese",
+      "location": "Ethiopian Highlands",
+      "source_ids": [
+        "S2"
+      ],
+      "narration": "Sacred ancestry offered little protection when Ahmed of Adal invaded in the sixteenth century. Years of war devastated the Christian kingdom. Portuguese military help contributed to Ahmed's defeat in fifteen forty-three, but victory did not restore everything the fighting had destroyed. The empire survived. Holding it together remained expensive, violent work, especially when local rulers had armies and ambitions of their own.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "resolute"
+    },
+    {
+      "scene_id": 8,
+      "chapter": "Roots",
+      "date_label": "1630s–1800s",
+      "asset_search_term": "Fasil Ghebbi Gondar castles",
+      "location": "Gondar",
+      "source_ids": [
+        "S2"
+      ],
+      "narration": "Emperor Fasilides established his capital at Gondar in the sixteen-thirties. Its castles projected the image of a settled royal court. Later, during the Era of the Princes, regional warlords reduced emperors to figureheads. The crown remained impressive. The people wearing it often lacked the power it advertised. Reuniting Ethiopia would require more than another coronation. Someone had to make the provinces obey.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "resolute"
+    },
+    {
+      "scene_id": 9,
+      "chapter": "Catalyst",
+      "date_label": "1855–1889",
+      "asset_search_term": "Tewodros II Yohannes IV Ethiopia",
+      "location": "Ethiopian Highlands",
+      "source_ids": [
+        "S2"
+      ],
+      "narration": "Tewodros the second tried to do that by force in the nineteenth century. His project of centralization outlived him, but he died before completing it. Yohannes the fourth faced invasions and pressure from neighboring powers, including Egypt and the Mahdist state. Each ruler confronted a similar calculation: how much authority could the center demand while the country was also fighting to survive?",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 10,
+      "chapter": "Catalyst",
+      "date_label": "1880s",
+      "asset_search_term": "Menelik II Shewa portrait",
+      "location": "Shewa",
+      "source_ids": [
+        "S3"
+      ],
+      "narration": "Menelik, king of Shewa, built power through diplomacy, imported rifles, and conquest. His expansion helped create the territory of modern Ethiopia. It also brought different experiences of empire under one crown. For the court, these campaigns meant a stronger state. For communities conquered in the south, they could mean lost land, imposed obligations, and government by outsiders. Those memories did not vanish when a foreign enemy arrived.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 11,
+      "chapter": "Catalyst",
+      "date_label": "1889",
+      "asset_search_term": "Taytu Betul Menelik Treaty of Wuchale",
+      "location": "Addis Ababa",
+      "source_ids": [
+        "S3"
+      ],
+      "narration": "Italy saw an opening. The Treaty of Wuchale, signed in eighteen eighty-nine, contained a dangerous difference between its Italian and Amharic versions. In one, Ethiopia could use Italy for foreign diplomacy. In the other, it was required to. Italy treated that wording as a protectorate. Menelik rejected the claim. Empress Taytu helped organize resistance. What looked like a diplomatic arrangement had become a struggle over who could speak for Ethiopia.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 12,
+      "chapter": "Catalyst",
+      "date_label": "March 1896",
+      "asset_search_term": "Battle of Adwa Ethiopian painting",
+      "location": "Adwa",
+      "source_ids": [
+        "S4"
+      ],
+      "narration": "Menelik and Taytu gathered a huge coalition, bringing regional leaders and their forces into the campaign. That is the preparation behind the opening disaster. At Adwa, the separated Italian brigades faced a much larger Ethiopian army. Confused movement and broken coordination made a bad position worse. The invasion collapsed. This wasn't a miracle that made weapons or planning irrelevant. Ethiopian preparation helped turn Italian mistakes into defeat.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 13,
+      "chapter": "Catalyst",
+      "date_label": "1896–1900",
+      "asset_search_term": "Menelik II Ethiopian independence",
+      "location": "Addis Ababa",
+      "source_ids": [
+        "S3",
+        "S4"
+      ],
+      "narration": "Italy recognized Ethiopian independence. Adwa became a powerful example that European conquest could be resisted. Yet defeating Italy answered one question: who would rule Ethiopia from outside? It did not settle who should hold power inside. Menelik's empire still contained communities with very different reasons to celebrate, negotiate with, or distrust the center. The victory was real. So was that unfinished argument.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 14,
+      "chapter": "Turning Point",
+      "date_label": "1935–1936",
+      "asset_search_term": "1935 Italian invasion Ethiopia aircraft mustard gas",
+      "location": "Ethiopian Highlands",
+      "source_ids": [
+        "S5"
+      ],
+      "narration": "Four decades later, Italy returned. Mussolini wanted an imperial conquest and revenge for Adwa. This time, aircraft and chemical weapons transformed the balance. Italian forces used mustard gas despite international prohibitions. Ethiopian armies could resist bravely and still face a devastating technological disadvantage. The familiar story of an invader misjudging the country now had a much darker outcome.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 15,
+      "chapter": "Turning Point",
+      "date_label": "1936",
+      "asset_search_term": "Haile Selassie Italian occupation Ethiopia",
+      "location": "Addis Ababa",
+      "source_ids": [
+        "S5"
+      ],
+      "narration": "In nineteen thirty-six, Italian troops entered Addis Ababa. Haile Selassie went into exile and appealed to the League of Nations. International institutions offered far less protection than he needed. But occupation did not mean uncontested control. Ethiopian resistance continued in the countryside. Italy could capture a capital, declare an empire, and still struggle to make people beyond its garrisons accept its rule.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 16,
+      "chapter": "Turning Point",
+      "date_label": "1941",
+      "asset_search_term": "Haile Selassie return Ethiopia 1941",
+      "location": "Addis Ababa",
+      "source_ids": [
+        "S5"
+      ],
+      "narration": "The Second World War changed the situation. In nineteen forty-one, Ethiopian patriots and British-led forces defeated the Italian occupation. Haile Selassie returned. The monarchy had survived an invasion and exile, but restoration brought back an old question along with the emperor: would rebuilding the state mean sharing power, or concentrating it more tightly at the top?",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 17,
+      "chapter": "Turning Point",
+      "date_label": "1974",
+      "asset_search_term": "Ethiopian revolution Derg Haile Selassie",
+      "location": "Addis Ababa",
+      "source_ids": [
+        "S6"
+      ],
+      "narration": "Over the following decades, imperial authority became increasingly difficult to defend. Rural hardship, anger over inequality, and the government's response to famine eroded confidence in the throne. Soldiers joined the unrest. In nineteen seventy-four, a military committee called the Derg removed Haile Selassie. The monarchy was finished. The officers promised transformation. They were much less interested in allowing opposition to decide what transformation should mean.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 18,
+      "chapter": "Turning Point",
+      "date_label": "1977–1978",
+      "asset_search_term": "Mengistu Haile Mariam Red Terror",
+      "location": "Ethiopia",
+      "source_ids": [
+        "S6"
+      ],
+      "narration": "Mengistu Haile Mariam emerged as the dominant figure. Under the Red Terror, the regime imprisoned and killed opponents. Political disagreement could become a death sentence. The language had changed from imperial authority to revolutionary socialism. The demand for obedience remained. Communities already resisting central control now faced a state that treated many challenges to its power as enemies to be eliminated.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 19,
+      "chapter": "Turning Point",
+      "date_label": "1980s",
+      "asset_search_term": "Ethiopian famine countryside 1984",
+      "location": "Ethiopian countryside",
+      "source_ids": [
+        "S6",
+        "S8"
+      ],
+      "narration": "Civil war, drought, and coercive government policies fed into the famine of the nineteen-eighties. Calling it a natural disaster alone misses what made it so destructive. War disrupted livelihoods and access to food. State decisions made suffering worse. Millions of people were caught between hunger, fighting, and displacement. The government that had promised to rebuild society was losing both its legitimacy and its grip.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "normal",
+      "bg_music_mood": "tense"
+    },
+    {
+      "scene_id": 20,
+      "chapter": "Aftermath",
+      "date_label": "May 1991",
+      "asset_search_term": "EPRDF Addis Ababa 1991",
+      "location": "Addis Ababa",
+      "source_ids": [
+        "S7",
+        "S8"
+      ],
+      "narration": "In nineteen ninety-one, rebel forces entered Addis Ababa and the Derg fell. Another government had captured the center. The new leadership still had to answer the question that had defeated its predecessors: how do you govern a country whose communities want security and political recognition, but do not all trust the same people to provide them?",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "calm",
+      "bg_music_mood": "reflective"
+    },
+    {
+      "scene_id": 21,
+      "chapter": "Aftermath",
+      "date_label": "1993",
+      "asset_search_term": "Eritrean independence referendum",
+      "location": "Asmara and Addis Ababa",
+      "source_ids": [
+        "S9"
+      ],
+      "narration": "Eritrea voted for independence in nineteen ninety-three. Within Ethiopia, the EPRDF built a federal system organized largely around ethnic and linguistic regions. The intention was to give different peoples a recognized place in the state. But drawing regional boundaries did not automatically resolve disputes over land, representation, or the center's authority. Decentralization changed the structure of the argument. It did not end it.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "calm",
+      "bg_music_mood": "reflective"
+    },
+    {
+      "scene_id": 22,
+      "chapter": "Aftermath",
+      "date_label": "2018–2019",
+      "asset_search_term": "Abiy Ahmed Prosperity Party",
+      "location": "Addis Ababa",
+      "source_ids": [
+        "S10"
+      ],
+      "narration": "Abiy Ahmed took office in twenty eighteen, promising reform. The following year, he brought much of the ruling coalition into a new Prosperity Party. The TPLF, long influential within the EPRDF, refused to join. What one side presented as national political renewal, the other viewed through the loss of its position and the risks of greater centralization. The dispute hardened.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "calm",
+      "bg_music_mood": "reflective"
+    },
+    {
+      "scene_id": 23,
+      "chapter": "Aftermath",
+      "date_label": "November 2020",
+      "asset_search_term": "Tigray region Ethiopia",
+      "location": "Tigray",
+      "source_ids": [
+        "S10"
+      ],
+      "narration": "In November twenty twenty, that confrontation became the Tigray War. Fighting between federal and regional forces expanded into a devastating conflict. Civilians faced killing, displacement, and hunger. Political arguments about the future of the state had once again become a catastrophe for people with little control over the decisions being made above them. This was no abstract dispute about a constitution.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "calm",
+      "bg_music_mood": "reflective"
+    },
+    {
+      "scene_id": 24,
+      "chapter": "Aftermath",
+      "date_label": "November 2022",
+      "asset_search_term": "Pretoria peace agreement Ethiopia",
+      "location": "Pretoria",
+      "source_ids": [
+        "S11"
+      ],
+      "narration": "An African Union-brokered agreement in Pretoria brought a cessation of hostilities in November twenty twenty-two. It was a crucial opening, not a promise that every grievance had been settled. At Adwa, Ethiopia's leaders had built unity against an invader. The harder task was making that unity work when the enemy was no longer outside the border. Survival could be won on a battlefield. Sharing a country required something the battlefield could never decide.",
+      "visual_type": "photograph",
+      "subtitle_highlights": [],
+      "delivery": "calm",
+      "bg_music_mood": "reflective"
+    }
+  ]
+}

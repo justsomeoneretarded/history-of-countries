@@ -22,16 +22,17 @@ from .media_api import MediaAPI, portable_schema
 from .script import BANNED, CHAPTERS, normalize_script, scene_schema, validate
 
 SPEECH_STYLE = (
-    "You are an engaged, informed conversational guide telling a friend a fascinating true story. "
-    "Speak naturally, warmly and clearly, around 170 to 180 words per minute overall. "
-    "Use short connected thoughts, light emphasis on contrasts and consequences, and varied rhythm. "
-    "Let a discovery land; give painful events a little space. Understated wit, never a comedy announcer. "
-    "No trailer voice, theatrical gravitas, breathy delivery or exaggerated accent. "
-    "Read only the supplied words exactly, including the ending. Do not announce a title or chapter."
+    "Tell this original history story to one interested listener. Warm, composed and alert, with a clear natural voice. "
+    "Aim around 165 to 175 words per minute across the piece, with connected phrasing and varied sentence rhythm. "
+    "Make the opening quietly compelling; let a surprising consequence land instead of shouting it. "
+    "Use a small pause at a change of thought, not a pause after every few words. "
+    "Understate irony. Give civilians' suffering and loss a little space without theatrical sadness. "
+    "Let the ending resolve with calm conviction. No trailer voice, exaggerated gravitas, breathy performance or singsong cadence. "
+    "Read EPRDF and TPLF as their letters. Read only the supplied words, including the last line; never announce titles or chapters."
 )
 
 STYLE_PROFILE = {
-    "version": 1,
+    "version": 2,
     "basis": "Craft analysis of the user's uploaded Jerusalem reference; local Whisper punctuation is approximate.",
     "reference_duration_seconds": 525.58,
     "reference_words_per_minute": 174.3,
@@ -569,9 +570,9 @@ def write(api, title, brief, minutes, evidence, directory):
     instruction = (
         "Write the complete ORIGINAL spoken documentary from this outline. The audience hears a person telling a story, not an essay. "
         f"Target {target} words, within5 percent. Use five ordered chapters: {', '.join(CHAPTERS)}. "
-        "Each scene has about 55–70 spoken words in 5–7 natural complete sentences. Each chapter must have at most450 words for TTS. "
+        "Each scene is one coherent story beat, usually 45–80 words. Each chapter must have at most450 words for TTS. "
         "Aim for a sentence median of 10–14 words. Use contractions, concrete people and actions, and plain active verbs. "
-        "Mix short emphatic lines with longer explanations. At least two sentences per scene should be 4–8 plain words and still complete thoughts. No fragments to game a target. "
+        "Mix short emphatic lines with longer explanations. Do not force a short-sentence quota or add closing slogans to fill a scene. Every sentence adds information, a choice, a consequence, or a transition. "
         "The voice is conversational, informed, curious, occasionally dryly funny. Never a trailer announcer or academic lecturer. "
         "The first sentence must show a concrete person doing something in the opening SCENE. Do not open with an abstract question or a historical overview. "
         "Explain names and stakes before adding more names. Use cause-and-consequence transitions and an occasional direct question. "
@@ -649,7 +650,7 @@ def write(api, title, brief, minutes, evidence, directory):
                 chapter_instruction + "\nRevise this draft ONCE for spoken length and conversational cadence together: " + "; ".join(reasons) + ". " +
                 ("Preserve supported facts and chapter order. Add missing required beats from the supplied evidence, correct date labels, and cite the appropriate source_ids for added facts. " if story_contract else "Preserve its facts, sequence, date labels and source_ids. ") +
                 "Use concrete phrasing and complete connected sentences, roughly 5–7 per 55–70-word scene. "
-                "Use the full word budget. No new fact-review workflow and no inline source-code citations.",
+                "Stay near the budget using concrete explanation; never pad it with repeated summaries. No new fact-review workflow and no inline source-code citations.",
                 {**payload, "draft": part}, chapter_script_schema(revision_sources, budget, count, 5.2 if story_contract else char_rate * 1.04),
                 max_output=6500, preserve_bounds=True)
             revised = clean_chapter_narration(revised, source_ids)
@@ -694,7 +695,7 @@ def audio_review(api, audio, measured):
     body = {"contents": [{"role": "user", "parts": [
         {"text": "Listen to the supplied original narration AUDIO. Evaluate natural conversational delivery, intelligibility, phrasing, expressive variation and intrusive synthetic/announcer characteristics. Do not judge historical facts or infer speaker identity. Do not automatically praise. Scores1–10. Note concrete audible strengths and defects. Measured diagnostics: " + json.dumps(measured)},
         {"inlineData": {"mimeType": "audio/wav", "data": base64.b64encode(Path(audio).read_bytes()).decode()}},
-    ]}], "generationConfig": {"temperature": .15, "maxOutputTokens": 1800, "responseMimeType": "application/json", "responseJsonSchema": portable_schema(schema), "thinkingConfig": {"thinkingLevel": "LOW"}}}
+    ]}], "generationConfig": {"temperature": .15, "maxOutputTokens": 4000, "responseMimeType": "application/json", "responseJsonSchema": portable_schema(schema), "thinkingConfig": {"thinkingLevel": "LOW"}}}
     response = api.request(model, "models/" + model + ":generateContent", body, "text")
     return json.loads("".join(p.get("text", "") for p in response["candidates"][0]["content"]["parts"] if not p.get("thought")))
 
@@ -750,6 +751,7 @@ def audition(api, script, directory):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--draft", choices=["ethiopia"], default=None)
     parser.add_argument("--stage", choices=["all", "plan", "audition", "voice"], default="all")
     parser.add_argument("--work", type=Path, default=ROOT / "work" / "countries")
     parser.add_argument("--title", default=os.getenv("VIDEO_TITLE", "The Entire History of Ethiopia"))
@@ -773,7 +775,11 @@ def main(argv=None):
                     raise PipelineError("Research source request failed (" + type(exc).__name__ + "); retry with saved checkpoints.") from None
             save_json(args.work / "research.json", evidence)
             save_json(args.work / "request.json", {"title": args.title, "brief": args.brief, "minutes": args.minutes, "voice": args.voice, "style_version": 1})
-            write(api, args.title, args.brief, args.minutes, evidence, args.work)
+            if args.draft:
+                from .editorial_story import write as editorial_write
+                editorial_write(api,args.title,args.brief,args.minutes,evidence,args.work,args.draft)
+            else:
+                write(api, args.title, args.brief, args.minutes, evidence, args.work)
         script = read_json(args.work / "script.json")
         if args.stage == "audition" or (args.stage == "all" and args.voice == "auto"):
             audition(api, script, args.work / "voice-auditions")

@@ -1,13 +1,14 @@
 {
   "title": "The Entire History of Ethiopia",
-  "brief": "Tell an original, conversational story of how Ethiopia built powerful kingdoms, resisted foreign conquest, and struggled over power at home. Connect Aksum and the medieval highlands to Menelik, Taytu, Adwa, the 1935 invasion, restoration, revolution, and the November 2022 Pretoria agreement. Use concrete choices and consequences. Match Jerusalem's natural narration and approximate length, and Pig War's varied explanatory acting. No channel branding, copied jokes, fabricated dialogue, or additional manual fact-review stage.",
-  "voice": "Charon",
+  "brief": "A natural, absorbing narrated history of Ethiopia, from Aksum through the November 2022 Pretoria agreement. Improve the opening's reversal and the story's connecting thread; make every scene advance a decision, consequence or change in power. Let the ending answer the opening without a slogan or subscription request. Use only real images and footage, preserve the whole source image, prefer widescreen compositions, and keep dates and other on-screen text minimal. Prioritize clear, warm, human-sounding narration over theatrical delivery.",
+  "voice": "auto",
   "minutes": 8.75,
   "youtube": true,
   "youtube_urls": [],
-  "phase": "full",
-  "resume_run": "45788358256",
+  "phase": "voice",
+  "editorial_draft": "ethiopia",
+  "resume_run": "45815732315",
   "resume_repository": "justsomeoneretarded/history-of-countries",
   "resume_artifact": "countries-checkpoint",
-  "attempt": 8
+  "attempt": 9
 }
