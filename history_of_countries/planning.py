@@ -170,7 +170,7 @@ def shots(script,speech,media,orders,fps=30):
               "global_end":finish/fps,"frames":b-a,"chapter":scene["chapter"],
               "narration_context":scene["narration"],"year_label":scene["date_label"],
               "motion":"hold","source_crop":False,"side_fill":"subtle",
-              "music_mood":"neutral" if scene["chapter"]=="Roots" else "somber" if scene.get("bg_music_mood")=="reflective" else "tense",
+              "music_mood":"neutral" if scene["chapter"]=="Roots" else "somber" if scene.get("bg_music_mood")=="reflective" else "tense" if scene.get("bg_music_mood")=="tense" else "neutral",
               "events":[],"source_start":source_start})
         position+=seconds;cursor=end
     return result
