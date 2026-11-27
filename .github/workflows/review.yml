@@ -1,0 +1,63 @@
+name: Review a finished history video
+on:
+  push:
+    branches: [main]
+    paths: ['production/reviews/*.json']
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Completed production run ID
+        required: true
+        default: '46054314537'
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: countries-video-review
+  cancel-in-progress: false
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      PYTHONUNBUFFERED: '1'
+      GEMINI_SCHEMA_MODE: prompt
+      GEMINI_INTERVAL_SECONDS: '65'
+      GEMINI_TEXT_REQUEST_BUDGET: '8'
+      GEMINI_MEDIA_LEDGER: work/video-review/usage.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Select the existing finished video
+        run: |
+          python - <<'PY'
+          import json,os,re
+          from pathlib import Path
+          event=json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          raw=event.get('inputs',{}) if os.environ['GITHUB_EVENT_NAME']=='workflow_dispatch' else json.loads(Path('production/reviews/latest.json').read_text())
+          run=str(raw['run_id'])
+          if not re.fullmatch(r'[0-9]+',run):raise ValueError('Numeric run ID required')
+          with open(os.environ['GITHUB_ENV'],'a') as output:output.write('REVIEW_RUN='+run+'\n')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: countries-video
+          run-id: ${{ env.REVIEW_RUN }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: input/video
+      - run: python -m pip install requests Pillow
+      - name: Review all sections of the actual MP4
+        env:
+          GEMINI_API_KEY: ${{ secrets.gemini_api_key }}
+        run: python -m scripts.review_finished
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: finished-video-review
+          path: output/video-review
+          retention-days: 30
+          if-no-files-found: warn
