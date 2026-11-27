@@ -65,6 +65,7 @@ def render(script,speech,catalog,work,output,profile,api=None,full_script=None,r
     save_json(output/"sources.json",evidence)
     selected={**catalog,"assets":[a for a in catalog["assets"] if a["id"] in used]}
     packaging.package(api,script,speech,selected,output,work)
+    if (work/"editorial-writing.json").exists():shutil.copy2(work/"editorial-writing.json",output/"story-notes.json")
     save_json(output/"media-discovery.json",{"provider_status":catalog.get("provider_status",[]),
       "used_images":len([i for i in used if records[i].get("medium") not in planning.VIDEO]),
       "used_videos":len([i for i in used if records[i].get("medium") in planning.VIDEO]),

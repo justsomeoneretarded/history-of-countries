@@ -36,7 +36,7 @@ def restore():
     source=Path("work/restore");destination=Path("work/countries")
     destination.mkdir(parents=True,exist_ok=True)
     names=["script.json","script.txt","research.json","request.json","style-profile.json",
-      "writing-metrics.json","narration-metrics.json","directed-packaging.json","speech","director-chapters","voice-auditions"]
+      "writing-metrics.json","editorial-writing.json","narration-metrics.json","directed-packaging.json","speech","director-chapters","voice-auditions"]
     if os.getenv("RESUME_ARTIFACT")=="countries-checkpoint":
         names+=["gemini","media","simple-render","storyboard.json"]
     for name in names:
