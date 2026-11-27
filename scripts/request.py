@@ -39,6 +39,9 @@ def restore():
       "writing-metrics.json","editorial-writing.json","narration-metrics.json","directed-packaging.json","speech","director-chapters","voice-auditions"]
     if os.getenv("RESUME_ARTIFACT")=="countries-checkpoint":
         names+=["gemini","media","simple-render","storyboard.json"]
+    request=json.loads(Path("work/input.json").read_text())
+    if request.get("fresh_pictures") is True:
+        names=[name for name in names if name not in {"simple-render","storyboard.json"}]
     for name in names:
         path=source/name
         if path.is_dir():shutil.copytree(path,destination/name,dirs_exist_ok=True)

@@ -36,3 +36,9 @@ path=work/"speech/masters"
 if path.exists():
     reports=[json.loads(p.read_text()) for p in sorted(path.glob("*.json"))]
     print("COUNTRIES_VOICE_MASTERS "+json.dumps(reports,ensure_ascii=False))
+
+path=work/"script.json"
+if path.exists():
+    value=json.loads(path.read_text())
+    print("COUNTRIES_NARRATION "+json.dumps({"title":value["title"],
+      "scenes":[{k:s.get(k) for k in ("scene_id","chapter","date_label","narration")} for s in value["scenes"]]},ensure_ascii=False))
