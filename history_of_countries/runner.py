@@ -105,12 +105,23 @@ def run(request,work,output):
     os.environ.setdefault("GEMINI_INPUT_TOKEN_BUDGET","40000")
     os.environ.setdefault("SCRIPT_TARGET_WPM","160")
     draft_args=["--draft",request["editorial_draft"]] if request["editorial_draft"] else []
-    code=director_script.main(["--stage","all","--title",request["title"],"--brief",request["brief"],
+    code=director_script.main(["--stage","plan","--title",request["title"],"--brief",request["brief"],
       "--voice",request["voice"],"--minutes",str(request["minutes"]),"--work",str(work),*draft_args])
     if code:
         if code==75:raise QuotaDeferred("Gemini free quota deferred; resume the saved countries-checkpoint after the quota reset")
         raise PipelineError("Writing or narration failed; see checkpoint failure.json")
-    script=read_json(work/"script.json");speech=read_json(work/"speech/speech.json")
+    script=read_json(work/"script.json")
+    if request["phase"]!="voice":
+        media_script={**script,"scenes":script["scenes"][:3]} if request["phase"]=="preview" else script
+        bootstrap.ensure(script["title"])
+        catalogue=media.build(media_script,work/"media",use_youtube=request["youtube"],youtube_urls=request["youtube_urls"])
+    # Resolve sourcing before spending free TTS quota. The writing pass is cached.
+    code=director_script.main(["--stage","all","--title",request["title"],"--brief",request["brief"],
+      "--voice",request["voice"],"--minutes",str(request["minutes"]),"--work",str(work),*draft_args])
+    if code:
+        if code==75:raise QuotaDeferred("Gemini free quota deferred; resume the saved countries-checkpoint after the quota reset")
+        raise PipelineError("Narration failed; accepted writing and media remain checkpointed")
+    speech=read_json(work/"speech/speech.json")
     if {str(s["scene_id"]) for s in speech["scenes"]}!={str(s["scene_id"]) for s in script["scenes"]}:raise PipelineError("Speech/script scene IDs do not match")
     if any(s.get("verification",{}).get("accepted") is not True for s in speech["scenes"]):raise PipelineError("Unverified narration cannot be exported")
     audition=work/"voice-auditions/audition.json"
@@ -127,8 +138,6 @@ def run(request,work,output):
         selected={s["scene_id"] for s in script["scenes"][:3]}
         script={**script,"scenes":[s for s in script["scenes"] if s["scene_id"] in selected]}
         speech={**speech,"scenes":[s for s in speech["scenes"] if s["scene_id"] in selected]}
-    bootstrap.ensure(script["title"])
-    catalogue=media.build(script,work/"media",use_youtube=request["youtube"],youtube_urls=request["youtube_urls"])
     return render(script,speech,catalogue,work,output,"cinematic" if request["phase"]=="full" else "preview",
       api=MediaAPI(work/"gemini"),request=request)
 

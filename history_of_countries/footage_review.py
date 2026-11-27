@@ -5,7 +5,7 @@ import math
 import os
 import re
 from pathlib import Path
-from .core import PipelineError,key,read_json,save_json
+from .core import PipelineError,key,read_json,save_json,ffmpeg
 from .gemini import QuotaDeferred
 from .media_api import portable_schema
 from .footage_search import context,words,PLACE_WORDS
@@ -28,7 +28,7 @@ INSTRUCTION=(
     "Review windows and any local-preview source offsets are provided. Only select times actually visible in them. "
     "Quote a short exact narration_anchor from the scene. Describe what is visibly on screen; metadata alone is insufficient. "
     "Reject static slideshows, someone talking to camera, another creator's explainers, animation, title sequences, "
-    "promotional montages, subtitles, logos/watermarks, unrelated scenery and graphic injury. "
+     "promotional montages, reenactments, costume shows, fictional war films, subtitles, logos/watermarks, unrelated scenery and graphic injury. "
     "No face identification: identities must come from supplied source context. "
     "For period_event require matching historical period supported by source context; a video uploaded in 2024 can contain 1935 newsreel. "
     "For present_day_place or surviving_object accept modern camera footage of a named place/object explained by the narration, "
@@ -106,8 +106,13 @@ def validate_segments(raw,info,scenes,windows):
                 named=words(scene.get("location","")+" "+scene.get("asset_search_term",""))
                 generic={"ethiopia","ethiopian","japan","japanese","country","highland","highlands","landscape","terrain"}
                 if not (visible&named)-generic:raise ValueError("No identified surviving subject")
-                if mode=="present_day_place" and not (words(scene["narration"])&visible)-generic:
-                    raise ValueError("Present-day place is not actually explained in the spoken passage")
+                if mode=="present_day_place":
+                    place=words(scene.get("location",""))-generic
+                    if not place&visible:raise ValueError("No specific named surviving location")
+                    if not (words(scene["narration"])&visible)-generic:
+                        raise ValueError("Present-day place is not actually explained in the spoken passage")
+                elif not words(scene.get("asset_search_term",""))&PLACE_WORDS&visible:
+                    raise ValueError("No identified surviving object")
             signature=(ident,round(start,2),round(end,2))
             if signature in seen:continue
             # Do not download overlapping copies and pretend they are fresh footage.
@@ -137,7 +142,9 @@ def inspect(api,info,scenes,directory,download):
     identity=key("video-inspection-v1",info["id"],info.get("title"),info.get("description"),scenes,windows,
                  os.getenv("GEMINI_FOOTAGE_MODEL","gemini-3.5-flash-lite"))
     cache=directory/(identity+".json")
-    if cache.exists():return read_json(cache)
+    if cache.exists():
+        saved=read_json(cache)
+        return {**saved,**validate_segments(saved,info,scenes,windows)}
     payload={"source":{"id":info["id"],"title":info.get("title"),"description":str(info.get("description",""))[:2200],
                        "duration":info.get("duration"),"chapters":info.get("chapters",[])},
              "review_windows":[{"source_start":a,"source_end":b} for a,b in windows],
@@ -155,6 +162,12 @@ def inspect(api,info,scenes,directory,download):
         a,b=windows[0];b=min(b,a+90)
         try:preview=download(info,a,b,directory/(info["id"]+"-preview.mp4"),height=480)
         except Exception as exc:raise PipelineError("Candidate preview download unavailable: "+type(exc).__name__) from None
+        # Bound inline bytes separately from source length and video sampling rate.
+        compact=directory/(info["id"]+"-review-small.mp4")
+        ffmpeg("-i",preview,"-an","-vf","scale=640:360:force_original_aspect_ratio=decrease",
+               "-c:v","libx264","-preset","veryfast","-crf","28","-maxrate","750k","-bufsize","1500k",compact,timeout=180)
+        if compact.stat().st_size>14*1024*1024:raise PipelineError("Preview exceeds the inline Gemini media budget")
+        preview=compact
         payload["review_windows"]=[{"source_start":a,"source_end":b}]
         payload["local_preview"]={"starts_at_source_second":a,"local_player_starts_at":0,
                                   "timestamp_rule":"Add source offset to local playback seconds"}

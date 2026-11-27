@@ -117,7 +117,8 @@ def test_deep_discovery_reports_failed_searches_and_does_not_invent_clips(tmp_pa
 
 def test_url_inspection_failure_falls_back_to_actual_downloaded_video(tmp_path):
     import json
-    path=tmp_path/"preview.mp4";path.write_bytes(b"test transport bytes")
+    path=tmp_path/"preview.mp4"
+    ffmpeg("-f","lavfi","-i","testsrc2=size=320x180:rate=15","-t","60","-an","-c:v","libx264","-pix_fmt","yuv420p",path)
     class Fake:
         def request(self,model,endpoint,body,kind):
             self.calls=getattr(self,"calls",0)+1
@@ -135,3 +136,36 @@ def test_twentieth_century_archive_cannot_illustrate_ancient_or_medieval_events(
     info={"title":"Ethiopian cavalry 1935 newsreel","description":"Ethiopian soldiers"}
     for label in ("340 AD","12th Century","500 BCE"):
         assert not youtube.related(info,scene(asset_search_term="Ethiopian cavalry",date_label=label))
+
+
+def test_modern_adwa_terrain_is_context_and_cannot_become_period_battle_film():
+    info={"title":"Adwa hills Ethiopia drone 2024","description":"Present-day terrain"}
+    passage=scene(location="Adwa",asset_search_term="Oreste Baratieri Adwa portrait",date_label="1896",narration="Columns moved into the hills around Adwa.")
+    assert youtube.related(info,passage)
+    assert search.context(info,passage)["presentation"]=="present_day_place_or_object"
+
+
+def test_sourcing_failure_is_resolved_before_tts_quota_is_spent(tmp_path,monkeypatch):
+    from history_of_countries import runner
+    from history_of_countries.core import save_json
+    calls=[]
+    def write(args):
+        calls.append(args[args.index("--stage")+1])
+        work=Path(args[args.index("--work")+1])
+        save_json(work/"script.json",{"title":"Ethiopia","scenes":[scene()]})
+        return 0
+    def missing(*args,**kwargs):raise PipelineError("No reusable media")
+    monkeypatch.setattr(runner.director_script,"main",write)
+    monkeypatch.setattr(runner.bootstrap,"ensure",lambda *args:None)
+    monkeypatch.setattr(runner.media,"build",missing)
+    with pytest.raises(PipelineError,match="No reusable media"):
+        runner.run({"title":"Ethiopia","brief":"Choices and consequences."},tmp_path/"work",tmp_path/"output")
+    assert calls==["plan"]
+
+def test_multiple_excerpts_from_one_work_need_one_description_attribution():
+    from history_of_countries.packaging import compact_attribution
+    common={"title":"Ethiopia archive newsreel","source_url":"https://www.youtube.com/watch?v=abcdefghijk",
+            "creator":"Archive channel","license":"CC BY 3.0","license_url":"https://creativecommons.org/licenses/by/3.0/"}
+    text=compact_attribution([{**common,"subject":"Troops marching"},{**common,"subject":"Vehicles arriving"}])
+    assert text.count(common["source_url"])==1
+    assert "Ethiopia archive newsreel" in text

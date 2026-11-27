@@ -35,7 +35,7 @@ def compact_attribution(assets):
  groups={}
  for asset in assets:
   group=(asset.get("creator") or "Creator identified on source page",asset["license"],asset.get("license_url",""))
-  entry=(asset["subject"],asset["source_url"])
+  entry=(asset.get("title") or asset["subject"],asset["source_url"])
   if entry not in groups.setdefault(group,[]):groups[group].append(entry)
  return "\n\n".join(
   creator+" — "+license+("\n"+url if url else "")+"\n"+
@@ -128,7 +128,7 @@ def package(api,script,speech,assets,output,work):
  checks={"passed":True,"title_characters":len(metadata["title"]),
    "description_characters":len(description),"description_budget":4900,
    "thumbnail_bytes":(output/"thumbnail.jpg").stat().st_size,
-   "required_visual_attributions":len(required),"grouped_credits":compacted,
+   "required_visual_attributions":len({a["source_url"] for a in required}),"grouped_credits":compacted,
    "reference_links_in_description":reference_links,
    "complete_credits_file":"sources-and-credits.txt"}
  if checks["thumbnail_bytes"]>=2_000_000:raise PipelineError("Thumbnail exceeds YouTube's 2 MB limit")
