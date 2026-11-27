@@ -124,7 +124,8 @@ def validate_segments(raw,info,scenes,windows):
         except (ValueError,TypeError,KeyError) as exc:
             reason=str(exc)
         if reason:rejected.append({"scene_id":str(row.get("scene_id","")) if isinstance(row,dict) else None,"reason":reason})
-    return {"summary":str(raw.get("summary","")),"segments":accepted,"rejected_segments":rejected}
+    return {"summary":str(raw.get("summary","")),"segments":accepted,"rejected_segments":rejected,
+            "proposed_segments":raw["segments"][:12]}
 
 def _call(api,parts,payload):
     model=os.getenv("GEMINI_FOOTAGE_MODEL","gemini-3.5-flash-lite")

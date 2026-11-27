@@ -66,6 +66,17 @@ def contact_sheet(assets,work):
     for i in range(0,len(data),8000):print("FOOTAGE_SHEET_CHUNK "+data[i:i+8000])
     print("FOOTAGE_SHEET_END")
 
+def print_evidence(report):
+    print("FOOTAGE_INSPECTIONS "+json.dumps([
+        {k:r.get(k) for k in ("source_id","mode","summary","segments","rejected_segments","native_url_error","inspected_windows")}
+        for r in report.get("inspection_reports",[])],ensure_ascii=False),flush=True)
+    print("FOOTAGE_LIBRARY "+json.dumps([
+        {k:a.get(k) for k in ("id","subject","title","source_url","source_start_seconds","source_end_seconds",
+                              "duration_seconds","width","height","footage_presentation","inspection_mode","inspection")}
+        for a in report.get("assets",[])],ensure_ascii=False),flush=True)
+    print("FOOTAGE_PROVIDER_FAILURES "+json.dumps([
+        row for row in report.get("provider_status",[]) if row.get("status") in {"unavailable","skipped"}],ensure_ascii=False),flush=True)
+
 def configure():
     request=input_request()
     resume=str(request.get("resume_run",""))
@@ -79,6 +90,14 @@ def main():
     restore=Path("work/footage-restore")
     if restore.exists():shutil.copytree(restore,work,dirs_exist_ok=True)
     save_json(work/"input.json",request)
+    if request.get("evidence_only") is True:
+        report=read_json(work/"media/youtube/discovery.json")
+        print("FOOTAGE_REHEARSAL "+json.dumps(read_json(work/"summary.json")),flush=True)
+        print_evidence(report)
+        contact_sheet(report["assets"],work)
+        compare=work/"story-comparison.json"
+        if compare.exists():print("STORY_COMPARISON "+json.dumps(read_json(compare)),flush=True)
+        return
     args=["--stage","plan","--title",request["title"],"--brief",request["brief"],
           "--minutes",str(request.get("minutes",8.75)),"--work",str(work)]
     if "ethiop" in request["title"].casefold():args+=["--draft","ethiopia"]
@@ -95,6 +114,7 @@ def main():
     save_json(work/"summary.json",{"upload_ready":False,"stage":"research_rehearsal","story_words":script["word_count"],
               "footage":report.get("summary",{}),
               "note":"These are available inspected excerpts. Actual edited footage coverage is measured separately at production."})
+    print_evidence(report)
     contact_sheet(report["assets"],work)
     print("FOOTAGE_REHEARSAL "+json.dumps(read_json(work/"summary.json")),flush=True)
     summary=os.getenv("GITHUB_STEP_SUMMARY")
