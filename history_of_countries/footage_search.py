@@ -4,6 +4,7 @@ import os
 import re
 import unicodedata
 from .core import PipelineError, key, read_json, save_json
+from .generic_assets import scene_period
 
 VERSION = "deep-footage-v1"
 GENERIC = {
@@ -70,10 +71,14 @@ def context(info,scene,title=""):
     surviving=bool((labels&PLACE_WORDS) and overlap)
     explicitly_modern=bool(re.search(r"\b(?:4k|8k|walking|walkthrough|tour|travel|drone|visit|today|present.day)\b",text,re.I))
     depicted=historical_years(heading)
-    spoken=historical_years(scene.get("date_label",""))
+    label=scene.get("date_label","")
+    spoken=historical_years(label)
+    period=scene_period(scene)
+    if period and re.search(r"\b(?:BCE|BC)\b",label,re.I):period=(-period[1],-period[0])
     # An archive's stated event year remains binding, including during a modern upload.
     archive=bool(re.search(r"\b(?:newsreel|archival|archive|battle|invasion|famine|revolution|occupation|war)\b",heading,re.I))
-    period_conflict=bool(depicted and spoken and min(abs(a-b) for a in depicted for b in spoken)>5)
+    period_conflict=bool(depicted and ((period and not any(period[0]-5<=year<=period[1]+5 for year in depicted)) or
+                                      (not period and spoken and min(abs(a-b) for a in depicted for b in spoken)>5)))
     if surviving and (explicitly_modern or not archive):
         mode="present_day_place_or_object";conflict=False
     else:

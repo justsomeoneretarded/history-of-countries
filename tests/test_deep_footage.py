@@ -129,3 +129,9 @@ def test_url_inspection_failure_falls_back_to_actual_downloaded_video(tmp_path):
     assert result["mode"]=="Gemini_downloaded_video"
     assert any("inlineData" in p for p in api.body["contents"][0]["parts"])
     assert result["segments"][0]["start"]==80
+
+
+def test_twentieth_century_archive_cannot_illustrate_ancient_or_medieval_events():
+    info={"title":"Ethiopian cavalry 1935 newsreel","description":"Ethiopian soldiers"}
+    for label in ("340 AD","12th Century","500 BCE"):
+        assert not youtube.related(info,scene(asset_search_term="Ethiopian cavalry",date_label=label))

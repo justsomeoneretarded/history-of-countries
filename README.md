@@ -71,9 +71,9 @@ To resume, provide the saved run ID and countries-checkpoint in the workflow. A 
 
 A full export is 1920×1080 at 30 fps, H.264 video and AAC stereo audio. Delivery includes the MP4, thumbnail, title, description, captions, script, full credits and measured reports.
 
-The test suite currently passes 91 checks. Tests encode and inspect actual media using synthetic fixtures. They verify transport and editing contracts, not human pronunciation or audience retention. Real productions also record speech-completeness measurements, actual voice comparisons and sampled listening observations.
+The test suite verifies transport and editing contracts, including footage-selection and sourcing failures. Tests encode and inspect actual media using synthetic fixtures. They verify transport and editing contracts, not human pronunciation or audience retention. Real productions also record speech-completeness measurements, actual voice comparisons and sampled listening observations.
 
-The refined Ethiopia edition completed successfully on **27 November 2026**: **9:02, 1920×1080 at 30 fps, Charon narration**, and a 1,488-word original story. All **91 tests** and full output checks passed.
+The previous Ethiopia edition completed successfully on **27 November 2026**: **9:02, 1920×1080 at 30 fps, Charon narration**, and a 1,488-word original story. All **91 tests** and full output checks passed.
 
 - [Download the refined video, upload files and voice-comparison samples](https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46054314537/artifacts/15226312314).
 - [Inspect the successful full production](https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46054314537).
@@ -90,3 +90,17 @@ For local use:
     history-countries --title "The Entire History of Japan" --brief "Explain how rulers, trade and political reforms changed who held power."
 
 FFmpeg and DejaVu fonts are required. The Actions workflow installs its system dependencies.
+
+## Deep footage discovery and story revision
+
+YouTube research now plans scene-specific queries in fair rounds: up to 200 queries × 8 results (1,600 result slots, versus 15 previously). These are capacity limits, not a promise of 1,600 distinct usable videos. Flat search is followed by up to 96 metadata inspections and 16 actual Gemini video reviews. Only explicit reusable rights are accepted. Modern filming/upload dates are distinguished from the historical subject; modern views of named surviving places and objects can illustrate earlier history.
+
+Gemini inspects several source windows and selects exact 6–30-second intervals tied to quoted narration. Slideshows, unrelated scenery, branding and period mismatches are rejected. Direct YouTube video input has a downloaded-preview fallback. Search results, metadata, video decisions and accepted excerpts are checkpointed. Hosted-runner extraction failures and quota exhaustion remain explicit in discovery reports.
+
+The default full production requires at least 25% actual moving-footage time in the edited timeline when YouTube research is enabled. A film below that level remains a saved draft with `upload_ready: false`, a `needs_sourcing` status and an explanatory sourcing report. Repeated-image holds and excessive frame fill are reported separately. The previous 9:02 Ethiopia export does not meet this new footage standard.
+
+The writing direction now establishes understandable stakes before unfamiliar names, builds sequences around consequential choices, varies sentence rhythm, and cuts repeated abstract summaries. The Ethiopia director draft has also been rewritten. Source evidence and the November 2022 endpoint remain part of the writing input; this adds no manual factual-approval stage.
+
+Use **Rehearse story and deep footage research** in Actions to test writing and sourcing without spending TTS quota or rendering a final film. Its artifact contains the script, a candid model comparison for Ethiopia, discovery records, inspected excerpts and a contact sheet. It is a research rehearsal, not an upload-ready video.
+
+Budget settings: `YOUTUBE_SEARCH_QUERIES`, `YOUTUBE_RESULTS_PER_QUERY`, `YOUTUBE_METADATA_LIMIT`, `YOUTUBE_REVIEW_LIMIT`, `YOUTUBE_MAX_CLIPS`, `YOUTUBE_SEARCH_SECONDS`, `YOUTUBE_TOTAL_SECONDS` and `FOOTAGE_MIN_FRACTION`. Search uses two workers; Gemini remains serial with the existing minimum 65-second pacing, model-specific ledger and free-tier guardrails. The full discovery stage has an 80-minute process budget; cached work makes retries cheaper. No paid provider or secret beyond `gemini_api_key` is required.
