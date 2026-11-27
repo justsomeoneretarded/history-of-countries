@@ -144,7 +144,10 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
     for url in list(urls)[:8]:
         ident=video_id(url)
         candidates.setdefault(ident,{"id":ident,"title":"","query_scene_ids":[str(s["scene_id"]) for s in script["scenes"]]})
+    manual_ids={video_id(url) for url in list(urls)[:8]}
+    counters["unique_candidates"]=len(candidates)
     shortlist=fair_shortlist(list(candidates.values()),script,limits.metadata_limit)
+    shortlist=([candidates[i] for i in sorted(manual_ids)]+[item for item in shortlist if item["id"] not in manual_ids])[:limits.metadata_limit]
     def metadata_for(item):
         path=directory/"metadata"/(item["id"]+".json")
         if path.exists():

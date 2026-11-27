@@ -37,6 +37,8 @@ def write(api,title,brief,minutes,evidence,directory,name):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
     draft=read_json(ROOT/"episodes/ethiopia-story.json");draft["title"]=title
     target=sum(len(s["narration"].split()) for s in draft["scenes"])
+    runtime_upper=round(minutes*float(os.getenv("SCRIPT_TARGET_WPM","160"))*1.1)
+    if target>runtime_upper:raise PipelineError("The complete Ethiopia draft exceeds this requested duration; use the title/brief writer for a shorter film")
     signature=key("spoken-director-edit-v2-story-stakes",draft,brief,minutes,SPEECH_STYLE,os.getenv("GEMINI_EDITOR_MODEL","gemini-3.5-flash-lite"))
     path=directory/"script.json"
     if path.exists():
@@ -49,7 +51,8 @@ def write(api,title,brief,minutes,evidence,directory,name):
     instruction=(
       "You are a documentary dialogue editor. Polish this ORIGINAL director's draft for an attentive, natural human narrator. "
       "Preserve every scene ID and scene order. Return the entire narration of every scene, even when unchanged. "
-      "Preserve supported claims, qualifications, chronology, named people and the November 2022 endpoint. Add no facts or quotations. "
+       "Preserve supported claims, qualifications, chronology, named people and the November 2022 endpoint. Add no facts or quotations. "
+      "Preserve concrete incidents such as soldiers making a visiting general try their food and water; never replace them with a generic summary of unrest. "
       "Keep the opening concrete and immediate: an army's expectation collides with what happens. Raise a question the ending actually answers. "
        "Make the middle move through choices and consequences, with clear transitions across centuries. "
       "Give each passage a fresh development: someone wants something, meets an obstacle, chooses, and changes another person's situation. "
@@ -61,13 +64,14 @@ def write(api,title,brief,minutes,evidence,directory,name):
       "Delete repetitions and vague summary sentences. Do not make every paragraph end with a dramatic slogan. "
       "Do not force a fixed number of short sentences. Avoid trailers, lectures, breathless hype and fake mysteries. "
       "Keep the final line decisive and specific; no subscription request, channel names, chapter announcements, source codes or 'in conclusion'. "
-      f"Keep total length within 8 percent of {target} words; each chapter stays below 450. "
+      f"Keep total length within 8 percent of {target} words and never exceed {runtime_upper} words; each chapter stays below 450. "
       "Return only the JSON narration edit. This is an editorial pass, not a new historical-review workflow.")
     accepted=draft;mode="original_director_draft";error=None
     try:
         raw=api.text(instruction,{"brief":brief,"draft":draft},shape,max_output=14000,
           model=os.getenv("GEMINI_EDITOR_MODEL","gemini-3.5-flash-lite"))
-        candidate=apply_edit(draft,raw);validate_edit(candidate,evidence,target)
+        candidate=apply_edit(draft,raw);edited_words=validate_edit(candidate,evidence,target)
+        if edited_words>runtime_upper:raise PipelineError("Spoken edit exceeds the runtime word budget")
         accepted=candidate;mode="original_director_draft_with_Gemini_spoken_edit"
     except PipelineError as exc:
         error=str(exc);print("Using the complete original director draft: "+error,flush=True)

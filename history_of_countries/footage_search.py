@@ -123,7 +123,7 @@ def deterministic_queries(script):
 def plan_queries(api,script,directory,limits):
     """One compact model call, then fair rounds so every story beat is searched."""
     fallback=deterministic_queries(script)
-    signature=key(VERSION,script,limits.max_queries)
+    signature=key(VERSION,script,limits.max_queries,limits.results_per_query)
     path=directory/"query-plan.json"
     if path.exists() and read_json(path).get("fingerprint")==signature:
         saved=read_json(path)

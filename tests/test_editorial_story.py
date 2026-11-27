@@ -29,3 +29,18 @@ def test_editor_cannot_drop_a_middle_scene_or_pad_with_summary_filler():
     with pytest.raises(PipelineError,match="omitted"):apply_edit(story,raw)
     story["scenes"][0]["narration"]+=" The plan fails."
     with pytest.raises(PipelineError,match="filler"):validate_edit(story,evidence(),1488)
+
+
+def test_spoken_edit_cannot_expand_past_runtime_before_tts(tmp_path,monkeypatch):
+    from history_of_countries.editorial_story import write
+    from history_of_countries.core import read_json
+    monkeypatch.setenv("SCRIPT_TARGET_WPM","160")
+    story=draft()
+    class Overlong:
+        def text(self,*args,**kwargs):
+            return {"scenes":[{"scene_id":s["scene_id"],"narration":s["narration"]+" That changed everything."} for s in story["scenes"]]}
+    result=write(Overlong(),"The Entire History of Ethiopia","Choices and consequences.",8.75,evidence(),tmp_path,"ethiopia")
+    report=read_json(tmp_path/"editorial-writing.json")
+    assert result["word_count"]==sum(len(s["narration"].split()) for s in story["scenes"])
+    assert report["mode"]=="original_director_draft"
+    assert "runtime word budget" in report["model_error"]
