@@ -433,7 +433,7 @@ def test_median_alone_cannot_approve_formal_padded_narration():
     sentence = "The ruling coalition maintained a powerful grip on all important state affairs."
     part = {"scenes": [story_scene(" ".join([sentence] * 10), ["S10"], "2019")]}
     assert script_metrics({"scenes": [{**part["scenes"][0], "chapter": "Aftermath"}]})["median_sentence_words"] == 12
-    assert any("short complete sentences" in issue for issue in chapter_style_issues(part))
+    assert any("repeated sentences" in issue for issue in chapter_style_issues(part))
 
 
 def test_failed_story_repair_is_bounded_and_cannot_publish_a_complete_script(tmp_path, monkeypatch):
@@ -494,3 +494,14 @@ def test_natural_delivery_is_preferred_to_a_more_theatrical_high_scoring_voice()
     theatrical={"voice":"Puck","verification":{"accepted":True},"words_per_minute":174,
       "review":{"naturalness":10,"clarity":10,"rhythm":10,"overacted":True}}
     assert choose_audition([theatrical,natural])["voice"]=="Charon"
+
+
+def test_specific_varied_narration_needs_no_forced_short_sentence_quota():
+    text=("Menelik imported rifles and used them to expand his control over neighboring territories. "
+      "For communities incorporated into the empire, this could mean lost autonomy and new obligations. "
+      "Italy then attempted to turn a treaty's disputed wording into a claim of external authority. "
+      "Menelik rejected that claim, while Taytu helped organize resistance to the invading force. "
+      "The resulting coalition brought regional rivals into the same campaign against Italian troops. "
+      "At Adwa their preparation helped turn separated Italian brigades into vulnerable targets. "
+      "Recognition of independence settled the foreign claim without settling every internal dispute over power.")
+    assert chapter_style_issues({"scenes":[story_scene(text,["S3"],"1896")]})==[]

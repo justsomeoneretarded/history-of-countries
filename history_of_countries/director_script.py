@@ -445,14 +445,15 @@ def chapter_story_issues(part, chapter):
 
 
 def chapter_style_issues(part):
-    metrics = script_metrics({"scenes": [{**s, "chapter": "Hook"} for s in part["scenes"]]})
-    issues = []
-    if metrics["words"] >= 100 and metrics["short_sentence_fraction"] < .18:
-        issues.append("too few short complete sentences; use at least two plain 4–8-word sentences per scene, connected to longer explanations")
-    text = " ".join(s["narration"] for s in part["scenes"])
-    filler = re.findall(r"beneath the surface|echoes of|outlast every storm|stood tall|proud empire|rich in resilience|under its own weight|inevitable clash of empires", text, re.I)
+    """Catch repetition and filler without imposing a short-sentence formula."""
+    text=" ".join(scene["narration"] for scene in part["scenes"])
+    sentences=[" ".join(re.findall(r"\w+",sentence.casefold())) for sentence in re.split(r"[.!?]+(?:\s+|$)",text) if sentence.strip()]
+    issues=[]
+    if any(sentences.count(sentence)>=3 for sentence in set(sentences)):
+        issues.append("replace repeated sentences with new information, a decision or a consequence")
+    filler=re.findall(r"beneath the surface|echoes of|outlast every storm|stood tall|proud empire|rich in resilience|under its own weight|inevitable clash of empires|the answers lie deep in the past|no one coordinates properly|the cycle of power remained unbroken",text,re.I)
     if filler:
-        issues.append("replace ornamental generalizations with named choices and effects: " + ", ".join(dict.fromkeys(filler)))
+        issues.append("replace ornamental generalizations with named choices and effects: "+", ".join(dict.fromkeys(filler)))
     return issues
 
 
