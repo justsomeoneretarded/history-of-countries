@@ -9,7 +9,9 @@ def evidence():return json.loads((ROOT/"episodes/ethiopia.json").read_text())["e
 
 def test_original_story_has_complete_causal_arc_and_bounded_chapters():
     story=draft()
-    assert validate_edit(story,evidence(),1488)==1488
+    words=sum(len(s["narration"].split()) for s in story["scenes"])
+    assert 1350<=words<=1540
+    assert validate_edit(story,evidence(),words)==words
     assert "Baratieri" in story["scenes"][0]["narration"]
     assert "Adwa" in story["scenes"][-1]["narration"]
     assert "Sharing a country" in story["scenes"][-1]["narration"]

@@ -37,7 +37,7 @@ def write(api,title,brief,minutes,evidence,directory,name):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
     draft=read_json(ROOT/"episodes/ethiopia-story.json");draft["title"]=title
     target=sum(len(s["narration"].split()) for s in draft["scenes"])
-    signature=key("spoken-director-edit-v1",draft,brief,minutes,SPEECH_STYLE,os.getenv("GEMINI_EDITOR_MODEL","gemini-3.5-flash-lite"))
+    signature=key("spoken-director-edit-v2-story-stakes",draft,brief,minutes,SPEECH_STYLE,os.getenv("GEMINI_EDITOR_MODEL","gemini-3.5-flash-lite"))
     path=directory/"script.json"
     if path.exists():
         cached=read_json(path)
@@ -51,7 +51,12 @@ def write(api,title,brief,minutes,evidence,directory,name):
       "Preserve every scene ID and scene order. Return the entire narration of every scene, even when unchanged. "
       "Preserve supported claims, qualifications, chronology, named people and the November 2022 endpoint. Add no facts or quotations. "
       "Keep the opening concrete and immediate: an army's expectation collides with what happens. Raise a question the ending actually answers. "
-      "Make the middle move through choices and consequences, with clear transitions across centuries. "
+       "Make the middle move through choices and consequences, with clear transitions across centuries. "
+      "Give each passage a fresh development: someone wants something, meets an obstacle, chooses, and changes another person's situation. "
+      "Improve weak passages substantively; returning every sentence unchanged is only appropriate if no better spoken version exists. "
+      "Remove repeated statements about unity, legitimacy or authority when the previous passage already made the point. "
+      "Keep the wry observations about rulers' contradictions and let concrete reversals provide the entertainment. Never force jokes. "
+      "Put understandable stakes before an unfamiliar surname. Deliver the causes promised by the hook and avoid constant teasers. "
       "Prefer language somebody says aloud. Vary sentence length and let difficult events breathe. Understate irony; never joke about suffering. "
       "Delete repetitions and vague summary sentences. Do not make every paragraph end with a dramatic slogan. "
       "Do not force a fixed number of short sentences. Avoid trailers, lectures, breathless hype and fake mysteries. "
@@ -68,7 +73,7 @@ def write(api,title,brief,minutes,evidence,directory,name):
         error=str(exc);print("Using the complete original director draft: "+error,flush=True)
     accepted=normalize_script(accepted);metrics=script_metrics(accepted)
     accepted.update(fingerprint=signature,word_count=metrics["words"],target_seconds=minutes*60,
-      script_target_words_per_minute=metrics["words"]/(minutes or 1),provenance=mode)
+      script_target_words_per_minute=metrics["words"]/max(.01,minutes),provenance=mode)
     save_json(path,accepted);save_json(directory/"writing-metrics.json",metrics)
     save_json(directory/"editorial-writing.json",{"mode":mode,"model_error":error,
       "opening":accepted["scenes"][0]["narration"],"ending":accepted["scenes"][-1]["narration"],

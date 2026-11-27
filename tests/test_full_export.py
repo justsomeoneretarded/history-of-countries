@@ -8,9 +8,9 @@ from history_of_countries import editing,director_sound
 from history_of_countries.core import save_json,read_json,probe,duration
 from history_of_countries.runner import render
 
-@pytest.mark.parametrize("profile,seconds,phase,total",[
-    ("test",2,"preview",10.0),("cinematic",6,"full",31.2)])
-def test_complete_editor_exports_muxed_video_metadata_and_preview_status(tmp_path,monkeypatch,profile,seconds,phase,total):
+@pytest.mark.parametrize("profile,seconds,phase,total,require_footage",[
+    ("test",2,"preview",10.0,False),("cinematic",6,"full",31.2,False),("cinematic",6,"full",31.2,True)])
+def test_complete_editor_exports_muxed_video_metadata_and_preview_status(tmp_path,monkeypatch,profile,seconds,phase,total,require_footage):
     monkeypatch.setitem(editing.PROFILES,profile,(320,180,30))
     work=tmp_path/"work";(work/"speech").mkdir(parents=True);output=tmp_path/"output"
     rate=48000;t=np.arange(rate*seconds)/rate
@@ -36,12 +36,18 @@ def test_complete_editor_exports_muxed_video_metadata_and_preview_status(tmp_pat
       "license":"CC0","license_url":"https://creativecommons.org/publicdomain/zero/1.0/",
       "source_url":"https://example.org/test-fixture","creator":"Test suite"}],
       "scenes":{str(i):["A"] for i in range(1,6)},"provider_status":[]}
-    video=render(script,speech,assets,work,output,profile,request={"phase":phase,"minutes":.5})
+    from history_of_countries.core import PipelineError
+    if require_footage:
+        with pytest.raises(PipelineError,match="insufficient moving footage"):
+            render(script,speech,assets,work,output,profile,request={"phase":phase,"minutes":.5,"youtube":True})
+        video=output/"final.mp4"
+    else:
+        video=render(script,speech,assets,work,output,profile,request={"phase":phase,"minutes":.5,"youtube":False})
     assert duration(video)==pytest.approx(total,abs=.03)
     streams=probe(video)["streams"]
     assert {s["codec_type"] for s in streams}=={"video","audio"}
     assert next(s for s in streams if s["codec_type"]=="video")["nb_frames"]==str(round(total*30))
     assert read_json(output/"quality.json")["passed"] is True
-    assert read_json(output/"delivery.json")["upload_ready"] is (phase=="full")
+    assert read_json(output/"delivery.json")["upload_ready"] is (phase=="full" and not require_footage)
     for name in ("thumbnail.jpg","description.txt","title.txt","captions.srt","sources-and-credits.txt"):
         assert (output/name).stat().st_size>0

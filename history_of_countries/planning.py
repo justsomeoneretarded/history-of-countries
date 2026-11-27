@@ -102,8 +102,13 @@ def _local_order(script,media,speech):
                 labels=set(re.findall(r"[a-z]{4,}",title+" "+" ".join(asset.get("tags",[]))))
                 value=3*len(terms&labels)
                 if military and asset.get("medium") in {"historical_artwork","archival_video"}:value+=4
-                if asset.get("medium") in VIDEO:value+=1
-                if asset.get("height") and asset.get("width",0)/asset["height"]>=1.55:value+=.4
+                if asset.get("medium") in VIDEO:
+                    value+=4
+                    anchor=set(re.findall(r"[a-z]{4,}",asset.get("inspection",{}).get("narration_anchor","").casefold()))
+                    if anchor:value+=5*len(terms&anchor)/max(1,len(terms))
+                if asset.get("height"):
+                    ratio=asset.get("width",0)/asset["height"]/(16/9)
+                    if ratio>0:value+=1.2*min(ratio,1/ratio)
                 if "portrait" in title and not terms&labels:value-=1
                 return value
             sequence.append(max(allowed,key=score))
@@ -112,7 +117,7 @@ def _local_order(script,media,speech):
 
 def make(api,script,speech,media,directory):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
-    fingerprint=key("simple-order-v5-phrase-cuts-uncropped",script,[s["duration"] for s in speech["scenes"]],
+    fingerprint=key("simple-order-v6-inspected-footage",script,[s["duration"] for s in speech["scenes"]],
       [{k:a.get(k) for k in ("id","subject","date","context","sha256","width","height")} for a in media["assets"]],media["scenes"])
     path=directory/"storyboard.json"
     if path.exists():
@@ -129,10 +134,10 @@ def make(api,script,speech,media,directory):
         payload={"scenes":[{"scene_id":str(s["scene_id"]),"narration":s["narration"],"date":s["date_label"],
           "shot_cues":_cues(spoken_by_id[str(s["scene_id"])]),
           "allowed_asset_ids":media["scenes"][str(s["scene_id"])]} for s in script["scenes"]],
-          "media":[{k:a.get(k) for k in ("id","subject","date","medium","context","width","height")} for a in media["assets"]]}
+          "media":[{k:a.get(k) for k in ("id","subject","date","medium","context","width","height","inspection","footage_presentation","duration_seconds")} for a in media["assets"]]}
         payload,aliases=compact_ids(payload)
         try:
-            raw=api.text("Return exactly one allowed asset ID per shot_cue, in cue order, for every passage. Repeats are allowed when the same subject continues. Match the words of each individual cue; do not just cycle portraits across an entire scene. Order only the allowed real images and footage for each passage. Choose what is being spoken about, in the order it is spoken. Prefer relevant moving footage where date and subject match. Prefer native widescreen views among equally relevant sources; all images are displayed whole, without artificial camera motion; use portraits for named people and surviving objects/places for ancient history. Do not treat modern views as contemporary footage of ancient events. Do not invent IDs, narration, or visual content. Return only JSON.",payload,schema,max_output=14000,
+            raw=api.text("Return exactly one allowed asset ID per shot_cue, in cue order, for every passage. Avoid an unchanged still beyond two cues when another equally relevant source exists. Use the inspected moving segments at their exact narration anchors; never substitute generic scenery just to increase a footage score. Match the words of each individual cue; do not just cycle portraits across an entire scene. Order only the allowed real images and footage for each passage. Choose what is being spoken about, in the order it is spoken. Prefer relevant moving footage where date and subject match. Prefer native widescreen views among equally relevant sources; all images are displayed whole, without artificial camera motion; use portraits for named people and surviving objects/places for ancient history. Do not treat modern views as contemporary footage of ancient events. Do not invent IDs, narration, or visual content. Return only JSON.",payload,schema,max_output=14000,
               model=os.getenv("GEMINI_PLANNER_MODEL","gemini-3.1-flash-lite"))
             raw=restore_ids(raw,aliases)
             orders,repairs=repair_order(raw,script,media,orders)

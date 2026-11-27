@@ -7,7 +7,7 @@ import shutil
 from .core import ROOT,PipelineError,read_json,save_json,ffmpeg,duration
 from .gemini import QuotaDeferred
 from .media_api import MediaAPI,VOICES
-from . import director_script,bootstrap,media,planning,editing,packaging,quality
+from . import director_script,bootstrap,media,planning,editing,packaging,quality,sourcing
 from .audio_edit import mix
 from .director_sound import compose
 
@@ -38,6 +38,8 @@ def render(script,speech,catalog,work,output,profile,api=None,full_script=None,r
         shots[-1]["global_end"]+=outro
     save_json(output/"storyboard.json",storyboard);save_json(output/"timeline.json",shots)
     records={a["id"]:a for a in catalog["assets"]}
+    sourcing_report=sourcing.assess(script,catalog,shots,required=bool((request or {}).get("youtube",False)))
+    save_json(output/"sourcing.json",sourcing_report)
     paths=[]
     for index,shot in enumerate(shots):
         print(f'Editing shot {index+1}/{len(shots)}, scene {shot["scene_id"]}: {records[shot["asset_id"]]["subject"][:75]}',flush=True)
@@ -69,11 +71,13 @@ def render(script,speech,catalog,work,output,profile,api=None,full_script=None,r
     save_json(output/"media-discovery.json",{"provider_status":catalog.get("provider_status",[]),
       "used_images":len([i for i in used if records[i].get("medium") not in planning.VIDEO]),
       "used_videos":len([i for i in used if records[i].get("medium") in planning.VIDEO]),
-      "used_youtube_videos":len([i for i in used if records[i].get("provider")=="YouTube Creative Commons"])})
+      "used_youtube_videos":len([i for i in used if records[i].get("provider")=="YouTube Creative Commons"]),
+      "deep_search":catalog.get("footage_research",{})})
     full=profile=="cinematic" and (request or {}).get("phase")=="full"
     if full and not .9*float(request["minutes"])*60<=narration_seconds<=1.1*float(request["minutes"])*60:raise PipelineError("The full narration missed the target duration")
-    save_json(output/"delivery.json",{"upload_ready":bool(full and report["passed"]),"preview":not full,
-      "duration_seconds":expected,"voice":speech["voice"],"technical_passed":report["passed"],
+    save_json(output/"delivery.json",{"upload_ready":bool(full and report["passed"] and sourcing_report["passed"]),"preview":not full,
+      "duration_seconds":expected,"voice":speech["voice"],"technical_passed":report["passed"],"sourcing_passed":sourcing_report["passed"],
+      "status":"upload_ready" if full and report["passed"] and sourcing_report["passed"] else "needs_sourcing" if not sourcing_report["passed"] else "preview",
       "visual_style":"Complete historical images and real footage, phrase-aligned cuts, discreet dates and no animation",
       "source_crop":False,"image_animation":False,"outro_seconds":outro,
       "youtube_published":False,"quality_scope":"Encoded-media, timing, speech-verification and provenance checks; no animation-score approval stage"})
@@ -85,6 +89,9 @@ def render(script,speech,catalog,work,output,profile,api=None,full_script=None,r
     if api is not None and full:
         from .listening import review as listen
         listen(api,final,speech,script,work,output)
+    if full and not sourcing_report["passed"]:
+        save_json(work/"progress.json",{"stage":"needs_sourcing","complete":False,"output":str(output),"failures":sourcing_report["failures"]})
+        raise PipelineError("Draft video saved; insufficient moving footage. See sourcing.json: "+"; ".join(sourcing_report["failures"]))
     save_json(work/"progress.json",{"stage":"complete","complete":True,"output":str(output)})
     return final
 

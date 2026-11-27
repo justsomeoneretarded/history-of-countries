@@ -116,6 +116,8 @@ def _merge(target,extra):
     for ident,ids in extra["scenes"].items():
         target["scenes"][ident]=list(dict.fromkeys(target["scenes"].get(ident,[])+ids))
     target["provider_status"].extend(extra["provider_status"])
+    if extra.get("version","").startswith("deep-footage"):
+        target["footage_research"]=extra.get("summary",{})
 
 
 def curated(script,directory):

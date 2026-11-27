@@ -66,6 +66,15 @@ jobs:
       GEMINI_PACKAGE_MODEL: gemini-3.5-flash-lite
       GEMINI_EDITOR_MODEL: gemini-3.5-flash-lite
       GEMINI_AUDIO_REVIEW_MODEL: gemini-3.5-flash-lite
+      GEMINI_FOOTAGE_MODEL: gemini-3.5-flash-lite
+      YOUTUBE_SEARCH_QUERIES: '200'
+      YOUTUBE_RESULTS_PER_QUERY: '8'
+      YOUTUBE_METADATA_LIMIT: '96'
+      YOUTUBE_REVIEW_LIMIT: '16'
+      YOUTUBE_MAX_CLIPS: '32'
+      YOUTUBE_SEARCH_SECONDS: '1200'
+      YOUTUBE_TOTAL_SECONDS: '4800'
+      FOOTAGE_MIN_FRACTION: '0.25'
       GEMINI_TTS_MODEL: gemini-3.8-flash-tts
       GEMINI_MEDIA_LEDGER: work/countries/gemini/usage.json
       GEMINI_TEXT_REQUEST_BUDGET: '32'

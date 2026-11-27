@@ -1,12 +1,18 @@
-"""Bounded YouTube discovery. Download only explicit Creative Commons reuse."""
+"""Deep, checkpointed YouTube research; only inspected reusable footage is accepted."""
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from collections import Counter
+from dataclasses import replace
 import hashlib
+import os
 import re
-import time
 import shutil
+import time
 from itertools import islice
 from urllib.parse import urlparse,parse_qs,urlencode
 from .core import PipelineError,key,read_json,save_json,probe
+from .footage_search import Limits,VERSION,context,related,plan_queries,fair_shortlist
+from .gemini import QuotaDeferred
 
 def video_id(url):
     parsed=urlparse(url)
@@ -26,115 +32,202 @@ def reusable(info):
             not info.get("is_live") and info.get("availability") not in {"private","premium_only","subscriber_only"} and
             not info.get("has_drm"))
 
-def related(info,scene):
-    """Require a named subject and, for dated archive, a matching period."""
-    text=(str(info.get("title",""))+" "+str(info.get("description",""))[:1800]).casefold()
-    query=scene.get("asset_search_term","")
-    words={w.casefold() for w in re.findall(r"[A-Za-z]{4,}",query)}
-    words-= {"historical","history","footage","archive","archival","scene","painting","image","photograph","ethiopian","ethiopia","ancient","medieval","modern","military"}
-    if not words or not words.intersection(set(re.findall(r"[a-z]{4,}",text))):return False
-    years={int(x) for x in re.findall(r"\b(?:18|19|20)\d{2}\b",str(info.get("title","")))}
-    spoken={int(x) for x in re.findall(r"\b(?:18|19|20)\d{2}\b",scene.get("date_label","")+" "+scene.get("narration",""))}
-    if years and spoken and min(abs(a-b) for a in years for b in spoken)>5:return False
-    if years and not spoken:return False
-    # Undated scenic footage can illustrate surviving places, not a named war.
-    if not years and re.search(r"\b(?:war|battle|invasion|famine|terror|massacre)\b",scene.get("narration",""),re.I):return False
-    return True
 
-def discover(script,directory,urls=(),max_queries=3,max_clips=5,ydl_factory=None):
+def _options():
+    result={"quiet":True,"no_warnings":True,"noplaylist":True,"socket_timeout":12,
+            "retries":1,"extractor_retries":1,"skip_download":True,"ignoreerrors":False,
+            "ignore_no_formats_error":True,"lazy_playlist":True}
+    node=shutil.which("node")
+    if node:result["js_runtimes"]={"node":{"path":node}}
+    return result
+
+def download_excerpt(info,start,end,target,height=1080,ydl_factory=None):
     from yt_dlp import YoutubeDL
     from yt_dlp.utils import download_range_func
-    directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
-    factory=ydl_factory or YoutubeDL
-    assets=[];assignments={};status=[];seen=set();started=time.monotonic()
-    options={"quiet":True,"no_warnings":True,"noplaylist":True,"socket_timeout":12,
-             "retries":1,"extractor_retries":1,"skip_download":True,"ignoreerrors":False,
-             "ignore_no_formats_error":True,"playlistend":5,"lazy_playlist":True}
-    node=shutil.which("node")
-    if node:options["js_runtimes"]={"node":{"path":node}}
-    jobs=[("https://www.youtube.com/watch?v="+video_id(u),None) for u in list(urls)[:8]]
-    eligible=[];decades=set()
-    for scene in script["scenes"]:
-        years=[int(y) for y in re.findall(r"\b(?:19|20)\d{2}\b",scene.get("date_label",""))]
-        if years and years[0]//10 not in decades:
-            eligible.append(scene);decades.add(years[0]//10)
-    if not eligible:eligible=script["scenes"]
-    country=re.sub(r"^(?:the\s+)?(?:entire\s+)?history\s+of\s+","",script.get("title",""),flags=re.I).split(":")[0]
-    # Broad country/year searches find archive releases that do not repeat a
-    # scriptwriter's long scene query. Include surviving-landmark footage too.
-    places=[s for s in script["scenes"] if re.search(r"\b(?:lalibela|stelae|temple|castle|ruins|pyramid|cathedral|palace)\b",s.get("asset_search_term",""),re.I)]
-    selected=eligible[:max_queries-1]+places[:1] if places else eligible[:max_queries]
-    for scene in selected:
-        year=re.search(r"\b(?:19|20)\d{2}\b",scene.get("date_label",""))
-        query=country+" "+year[0] if year else scene["asset_search_term"]
-        jobs.append((search_url(query),scene))
-    for query,requested_scene in jobs:
-        if len(assets)>=max_clips or time.monotonic()-started>180:break
+    target=Path(target);target.parent.mkdir(parents=True,exist_ok=True)
+    if target.exists():
         try:
-            settings={**options,**({"extract_flat":"in_playlist"} if requested_scene is not None else {})}
-            with factory(settings) as ydl:raw=ydl.extract_info(query,download=False)
-            candidates=islice(raw.get("entries") or [],5) if raw and "entries" in raw else [raw]
-            count_before=len(assets);candidate_count=0
-            for info in candidates:
-                candidate_count+=1
-                if not isinstance(info,dict) or info.get("id") in seen:continue
-                if requested_scene is not None:
-                    try:
-                        with factory(options) as ydl:info=ydl.extract_info("https://www.youtube.com/watch?v="+info["id"],download=False)
-                    except Exception as exc:
-                        status.append({"video_id":info.get("id"),"status":"unavailable","reason":type(exc).__name__});continue
-                    if not isinstance(info,dict):continue
-                seen.add(info.get("id"))
-                if not reusable(info):
-                    status.append({"video_id":info.get("id"),"status":"skipped","reason":"Explicit reusable CC BY license not established"});continue
-                matches=[s for s in script["scenes"] if related(info,s)]
-                if not matches:
-                    status.append({"video_id":info["id"],"status":"skipped","reason":"Subject/date did not match the spoken story"});continue
-                total=float(info.get("duration") or 0)
-                if total<4:continue
-                beginning=min(8.,max(0.,total-10.));end=min(total,beginning+12.)
-                ident="youtube-"+info["id"];path=directory/(ident+".mp4")
-                if not path.exists():
-                    settings={**options,"skip_download":False,
-                      "format":"bestvideo[ext=mp4][height<=1080]/best[ext=mp4][height<=1080]/bestvideo[height<=1080]/best[height<=1080]",
-                      "outtmpl":str(directory/(ident+".%(ext)s")),"merge_output_format":"mp4",
-                      "download_ranges":download_range_func(None,[(beginning,end)]),
-                      "force_keyframes_at_cuts":True,"max_filesize":200*1024*1024}
-                    with factory(settings) as ydl:ydl.download(["https://www.youtube.com/watch?v="+info["id"]])
-                    alternatives=list(directory.glob(ident+".*"))
-                    actual=next((p for p in alternatives if p.suffix in {".mp4",".webm",".mkv"}),None)
-                    if actual is None:raise PipelineError("YouTube did not produce a usable excerpt")
-                    path=actual
-                metadata=probe(path)
-                if not any(s["codec_type"]=="video" for s in metadata["streams"]):raise PipelineError("YouTube excerpt has no video")
-                record={"id":ident,"path":str(path.resolve()),"subject":info["title"],"title":info["title"],
-                  "date":"Dates/context as supplied by uploader; matched to scene before use",
-                  "medium":"video","provider":"YouTube Creative Commons","license":"CC BY 3.0",
-                  "license_url":"https://creativecommons.org/licenses/by/3.0/",
-                  "source_url":"https://www.youtube.com/watch?v="+info["id"],
-                  "creator":info.get("uploader") or info.get("channel") or "YouTube uploader",
-                  "context":info.get("description","")[:500],"source_start_seconds":beginning,
-                  "duration_seconds":float(metadata["format"]["duration"]),
-                  "sha256":hashlib.sha256(path.read_bytes()).hexdigest()}
-                assets.append(record)
-                for scene in matches:assignments.setdefault(str(scene["scene_id"]),[]).append(ident)
-                status.append({"video_id":info["id"],"status":"available","scene_ids":[s["scene_id"] for s in matches]})
-                if len(assets)>=max_clips:break
-            if requested_scene is not None:
-                status.append({"provider":"YouTube","query":query,"status":"searched",
-                  "candidate_count":candidate_count,"accepted_clips":len(assets)-count_before})
-        except Exception as exc:
-            status.append({"query":query,"status":"unavailable","reason":type(exc).__name__})
-    report={"assets":assets,"scenes":assignments,"provider_status":status,
-      "note":"YouTube can reject hosted-runner downloads. No login, DRM, or standard-license bypass is attempted. Available archive photographs/footage remain usable."}
-    save_json(directory/"discovery.json",report);return report
+            meta=probe(target)
+            if abs(float(meta["format"]["duration"])-(end-start))<1:return target
+        except (PipelineError,ValueError,KeyError):pass
+        target.unlink(missing_ok=True)
+    factory=ydl_factory or YoutubeDL
+    settings={**_options(),"skip_download":False,
+              "format":f"bestvideo[ext=mp4][height<={height}]/best[ext=mp4][height<={height}]/bestvideo[height<={height}]/best[height<={height}]",
+              "outtmpl":str(target.with_suffix(".%(ext)s")),"merge_output_format":"mp4",
+              "download_ranges":download_range_func(None,[(start,end)]),"force_keyframes_at_cuts":True,
+              "external_downloader_args":{"ffmpeg_i":["-rw_timeout","15000000"]}}
+    with factory(settings) as ydl:ydl.download(["https://www.youtube.com/watch?v="+info["id"]])
+    actual=next((p for p in target.parent.glob(target.stem+".*") if p.suffix in {".mp4",".webm",".mkv"} and p.stat().st_size>0),None)
+    if actual is None:raise PipelineError("YouTube did not produce an excerpt")
+    if actual.stat().st_size>180*1024*1024:
+        actual.unlink();raise PipelineError("Excerpt exceeded the local size budget")
+    if actual!=target:
+        from .core import ffmpeg
+        ffmpeg("-i",actual,"-an","-c:v","libx264","-preset","veryfast","-crf","20","-pix_fmt","yuv420p",target,timeout=180)
+        actual.unlink()
+    meta=probe(target)
+    stream=next((s for s in meta["streams"] if s.get("codec_type")=="video"),None)
+    if stream is None:raise PipelineError("Excerpt has no decodable video")
+    if float(meta["format"]["duration"])<end-start-.35:raise PipelineError("Downloaded excerpt is truncated")
+    if int(stream.get("width",0))<480 or int(stream.get("height",0))<270:raise PipelineError("Excerpt resolution is too low")
+    return target
 
+def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factory=None,api=None,limits=None,reviewer=None):
+    from yt_dlp import YoutubeDL
+    from .footage_review import inspect
+    from .media_api import MediaAPI
+    directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
+    limits=limits or Limits.environment()
+    if max_queries is not None:limits=replace(limits,max_queries=max_queries)
+    if max_clips is not None:limits=replace(limits,max_clips=max_clips)
+    factory=ydl_factory or YoutubeDL
+    if api is None and (os.getenv("GEMINI_API") or os.getenv("GEMINI_API_KEY")):
+        api=MediaAPI(directory.parent.parent/"gemini")
+    started=time.monotonic();deadline=started+limits.total_seconds
+    queries,plan=plan_queries(api,script,directory,limits)
+    assets=[];assignments={};status=[];candidates={};metadata=[];reviews=[]
+    counters={"planned_queries":len(queries),"attempted_queries":0,"cached_queries":0,"search_result_rows":0,
+              "unique_candidates":0,"metadata_inspected":0,"eligible_cc_candidates":0,
+              "video_reviews_started":0,"video_reviews_completed":0}
+    def checkpoint():
+        summary={**counters,"accepted_clips":len(assets),
+                 "accepted_seconds":round(sum(a.get("duration_seconds",0) for a in assets),2),
+                 "scenes_with_footage":len(assignments),"total_scenes":len(script["scenes"]),
+                 "capacity_results":plan["capacity_results"],"legacy_capacity_results":15,
+                 "elapsed_seconds":round(time.monotonic()-started,1),
+                 "uncovered_scene_ids":[str(s["scene_id"]) for s in script["scenes"] if not assignments.get(str(s["scene_id"]))],
+                 "error_counts":dict(Counter(row.get("reason","") for row in status if row.get("status")=="unavailable"))}
+        result={"version":VERSION,"assets":assets,"scenes":assignments,"provider_status":status,"summary":summary,
+                "inspection_reports":reviews,
+                "note":"Only explicit reusable rights plus actual Gemini video inspection qualify a clip. Missing footage remains visible; no login or DRM bypass."}
+        save_json(directory/"discovery.json",result)
+        return result
+    options=_options()
+    def search(row):
+        path=directory/"search"/(key(VERSION,row["query"],limits.results_per_query)+".json")
+        if path.exists():return row,read_json(path),True,None
+        try:
+            settings={**options,"extract_flat":"in_playlist","playlistend":limits.results_per_query}
+            with factory(settings) as ydl:
+                raw=ydl.extract_info(search_url(row["query"]),download=False)
+                entries=list(islice((raw or {}).get("entries") or [],limits.results_per_query))
+            values=[{k:e.get(k) for k in ("id","title","description","duration","url","channel","uploader")}
+                    for e in entries if isinstance(e,dict) and re.fullmatch(r"[A-Za-z0-9_-]{11}",str(e.get("id","")))]
+            save_json(path,values);return row,values,False,None
+        except Exception as exc:return row,[],False,type(exc).__name__
+    # Small batches retain scene fairness, checkpoint every response and avoid a request burst.
+    failed_streak=0
+    with ThreadPoolExecutor(max_workers=limits.workers) as pool:
+        for index in range(0,len(queries),limits.workers):
+            if time.monotonic()-started>limits.search_seconds or time.monotonic()>deadline:break
+            batch=queries[index:index+limits.workers]
+            for row,values,cached,error in pool.map(search,batch):
+                counters["attempted_queries"]+=1;counters["cached_queries"]+=int(cached)
+                counters["search_result_rows"]+=len(values)
+                if error:
+                    failed_streak+=1
+                    status.append({"provider":"YouTube","query":row["query"],"scene_id":row["scene_id"],
+                                   "status":"unavailable","reason":error})
+                else:
+                    failed_streak=0
+                    status.append({"provider":"YouTube","query":row["query"],"scene_id":row["scene_id"],
+                                   "status":"searched","candidate_count":len(values),"cached":cached})
+                for item in values:
+                    old=candidates.setdefault(item["id"],{**item,"query_scene_ids":[]})
+                    if row["scene_id"] not in old["query_scene_ids"]:old["query_scene_ids"].append(row["scene_id"])
+                counters["unique_candidates"]=len(candidates);checkpoint()
+            print(f'YouTube research: {counters["attempted_queries"]}/{len(queries)} queries, {len(candidates)} unique candidates',flush=True)
+            if failed_streak>=12:
+                status.append({"provider":"YouTube","status":"unavailable","reason":"persistent_search_failure_circuit_breaker"})
+                break
+    for url in list(urls)[:8]:
+        ident=video_id(url)
+        candidates.setdefault(ident,{"id":ident,"title":"","query_scene_ids":[str(s["scene_id"]) for s in script["scenes"]]})
+    shortlist=fair_shortlist(list(candidates.values()),script,limits.metadata_limit)
+    def metadata_for(item):
+        path=directory/"metadata"/(item["id"]+".json")
+        if path.exists():
+            cached=read_json(path)
+            if time.time()-cached.get("checked_at",0)<86400:
+                return {**cached["info"],"query_scene_ids":item["query_scene_ids"]},None
+        try:
+            with factory(options) as ydl:raw=ydl.extract_info("https://www.youtube.com/watch?v="+item["id"],download=False)
+            if not isinstance(raw,dict):raise PipelineError("No video metadata")
+            fields=("id","title","description","duration","license","is_live","availability","has_drm","chapters","uploader","channel","upload_date")
+            info={k:raw.get(k) for k in fields};info["query_scene_ids"]=item["query_scene_ids"]
+            save_json(path,{"checked_at":time.time(),"info":info});return info,None
+        except Exception as exc:return item,type(exc).__name__
+    with ThreadPoolExecutor(max_workers=limits.workers) as pool:
+        for index in range(0,len(shortlist),limits.workers):
+            if time.monotonic()>deadline:break
+            for info,error in pool.map(metadata_for,shortlist[index:index+limits.workers]):
+                counters["metadata_inspected"]+=1
+                if error:status.append({"video_id":info["id"],"status":"unavailable","reason":error})
+                elif not reusable(info):status.append({"video_id":info["id"],"status":"skipped","reason":"Explicit reusable CC BY license not established"})
+                elif not isinstance(info.get("duration"),(int,float)) or not 6<=info["duration"]<=7200:
+                    status.append({"video_id":info["id"],"status":"skipped","reason":"Source outside bounded inspection duration"})
+                else:metadata.append(info);counters["eligible_cc_candidates"]+=1
+                checkpoint()
+    ordered=fair_shortlist(metadata,script,limits.review_limit)
+    def download(info,a,b,path,height=1080):
+        return download_excerpt(info,a,b,path,height,ydl_factory=factory)
+    review_function=reviewer or inspect
+    for info in ordered:
+        if len(assets)>=limits.max_clips or time.monotonic()>deadline:break
+        queried=set(info.get("query_scene_ids",[]))
+        matches=[s for s in script["scenes"] if str(s["scene_id"]) in queried or context(info,s,script["title"])["subject_terms"]]
+        matches=sorted(matches,key=lambda s:(
+            -int(str(s["scene_id"]) in queried),-context(info,s,script["title"])["score"]))[:5]
+        if api is None and reviewer is None:
+            status.append({"video_id":info["id"],"status":"unavailable","reason":"Gemini video inspection unavailable"});continue
+        counters["video_reviews_started"]+=1;checkpoint()
+        try:
+            reviewed=review_function(api,info,matches,directory/"reviews",download)
+            counters["video_reviews_completed"]+=1
+            reviews.append(reviewed);checkpoint()
+        except QuotaDeferred as exc:
+            status.append({"video_id":info["id"],"status":"unavailable","reason":"Gemini_free_quota_deferred"})
+            print("Footage inspection paused; accepted clips and searches preserved: "+str(exc),flush=True);break
+        except (PipelineError,ValueError,KeyError,TypeError,OSError) as exc:
+            status.append({"video_id":info["id"],"status":"unavailable","reason":type(exc).__name__,"stage":"video_inspection"})
+            print("Candidate video inspection failed: "+str(exc)[:240],flush=True);continue
+        for segment in reviewed["segments"]:
+            if len(assets)>=limits.max_clips or time.monotonic()>deadline:break
+            a,b=segment["start"],segment["end"]
+            ident="youtube-"+info["id"]+"-"+str(round(a*1000))+"-"+str(round(b*1000))
+            try:
+                path=download(info,a,b,directory/"clips"/(ident+".mp4"))
+                meta=probe(path);stream=next(s for s in meta["streams"] if s["codec_type"]=="video")
+                record={"id":ident,"path":str(path.resolve()),"subject":segment["observed"],"title":info["title"],
+                        "date":"Historical period and filming date distinguished in inspection metadata",
+                        "medium":"video","provider":"YouTube Creative Commons","license":"CC BY 3.0",
+                        "license_url":"https://creativecommons.org/licenses/by/3.0/",
+                        "source_url":"https://www.youtube.com/watch?v="+info["id"],
+                        "creator":info.get("uploader") or info.get("channel") or "YouTube uploader",
+                        "context":segment["observed"]+" Supports: "+segment["narration_anchor"],
+                        "source_start_seconds":a,"source_end_seconds":b,"filming_or_upload_date":info.get("upload_date"),
+                        "footage_presentation":segment["presentation"],"inspection":segment,"inspection_mode":reviewed["mode"],
+                        "width":int(stream["width"]),"height":int(stream["height"]),
+                        "duration_seconds":min(b-a,float(meta["format"]["duration"])),
+                        "sha256":hashlib.sha256(path.read_bytes()).hexdigest()}
+                assets.append(record);assignments.setdefault(str(segment["scene_id"]),[]).append(ident)
+                status.append({"video_id":info["id"],"status":"available","scene_id":segment["scene_id"],
+                               "source_start":a,"source_end":b,"presentation":segment["presentation"]})
+                checkpoint()
+            except Exception as exc:
+                status.append({"video_id":info["id"],"status":"unavailable","reason":type(exc).__name__,"stage":"excerpt_download"})
+                print("Selected footage download unavailable: "+str(exc)[:180],flush=True)
+    result=checkpoint()
+    print("YOUTUBE_DEEP_SEARCH "+__import__("json").dumps(result["summary"]),flush=True)
+    return result
 
-def bounded(script,directory,urls=(),timeout=240):
-    """Kill a stalled extractor and its FFmpeg children after the whole deadline."""
-    import os,signal,subprocess,sys
+def bounded(script,directory,urls=(),timeout=None):
+    """Whole-process deadline includes search, Gemini pacing and download children."""
+    import signal,subprocess,sys
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
     request=directory/"request.json";save_json(request,{"script":script,"urls":list(urls)})
+    timeout=timeout or Limits.environment().total_seconds+120
     process=subprocess.Popen([sys.executable,"-m","history_of_countries.youtube","--request",str(request),"--output",str(directory)],
                              start_new_session=True)
     try:
@@ -147,8 +240,10 @@ def bounded(script,directory,urls=(),timeout=240):
         except subprocess.TimeoutExpired:
             os.killpg(process.pid,signal.SIGKILL);process.wait()
         reason="whole_discovery_deadline"
-    result={"assets":[],"scenes":{},"provider_status":[{"provider":"YouTube","status":"unavailable","reason":reason}]}
-    save_json(directory/"discovery.json",result);return result
+    path=directory/"discovery.json"
+    result=read_json(path) if path.exists() else {"assets":[],"scenes":{},"provider_status":[]}
+    result["provider_status"].append({"provider":"YouTube","status":"unavailable","reason":reason})
+    save_json(path,result);return result
 
 if __name__=="__main__":
     import argparse
@@ -156,5 +251,4 @@ if __name__=="__main__":
     parser.add_argument("--request",type=Path,required=True)
     parser.add_argument("--output",type=Path,required=True)
     args=parser.parse_args()
-    request=read_json(args.request)
-    discover(request["script"],args.output,request.get("urls",[]))
+    request=read_json(args.request);discover(request["script"],args.output,request.get("urls",[]))
