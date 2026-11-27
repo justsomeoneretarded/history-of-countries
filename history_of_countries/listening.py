@@ -26,7 +26,7 @@ def review(api,video,speech,script,directory,output):
     measured={"sampled_sections":[{"start":a,"seconds":b} for a,b in sections],
       "full_video_seconds":seconds,"voice":speech["voice"],
       "review_edits":"Opening, middle and ending excerpts are joined only for this listening sample.",
-      "listen_for":"Natural voice, intelligibility, music masking, harshness, distortion and a calm resolved ending. Do not treat review-sample joins as actual film cuts."}
+      "listen_for":"Natural voice, intelligibility, music masking, harshness, distortion, consistent timbre and pacing across excerpts, and a calm resolved ending. Do not treat review-sample joins as actual film cuts."}
     try:
         heard=audio_review(api,sample,measured)
         for field in ("naturalness","clarity","rhythm"):

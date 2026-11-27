@@ -62,5 +62,6 @@ def produce(api,script,voice,directory):
    words=[{**w,'start':max(0,w['start']-start),'end':min(end-start,max(.02,w['end']-start))} for w in record['words'][cursor:endword]]
    results.append({'scene_id':scene['scene_id'],'audio':target.name,'duration':duration(target),'words':words,'captions':caption_groups(words),'verification':record['verification'],'generation_seconds':record['generation_seconds'],'provider':'Gemini','model':record['model']})
    start=end;cursor=endword
- final={'fingerprint':identity,'voice':voice,'provider':'Gemini','model':os.getenv('GEMINI_TTS_MODEL','gemini-3.8-flash-tts'),'scenes':results}
+ models=sorted({s["model"] for s in results})
+ final={'fingerprint':identity,'voice':voice,'provider':'Gemini','model':models[0] if len(models)==1 else 'mixed_Gemini_TTS','models_used':models,'scenes':results}
  save_json(index,final);return final
