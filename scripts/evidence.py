@@ -3,7 +3,7 @@ from pathlib import Path
 import base64,io,json
 from PIL import Image
 work=Path("work/countries");output=Path("output/countries")
-for root,names in ((work,["narration-metrics.json","progress.json","failure.json"]),(output,["quality.json","delivery.json","failure.json","media-discovery.json","package-checks.json"])):
+for root,names in ((work,["writing-metrics.json","editorial-writing.json","narration-metrics.json","progress.json","failure.json","voice-auditions/audition.json"]),(output,["quality.json","delivery.json","failure.json","media-discovery.json","package-checks.json","framing.json","final-listening.json"])):
     for name in names:
         path=root/name
         if path.exists():
@@ -31,3 +31,8 @@ path=output/"description.txt"
 if path.exists():
     print("COUNTRIES_UPLOAD_METADATA "+json.dumps({"title":(output/"title.txt").read_text().strip(),
       "description_characters":len(path.read_text()),"description":path.read_text()},ensure_ascii=False))
+
+path=work/"speech/masters"
+if path.exists():
+    reports=[json.loads(p.read_text()) for p in sorted(path.glob("*.json"))]
+    print("COUNTRIES_VOICE_MASTERS "+json.dumps(reports,ensure_ascii=False))

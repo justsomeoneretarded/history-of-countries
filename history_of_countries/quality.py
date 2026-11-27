@@ -31,7 +31,7 @@ def inspect(video,script,speech,assets,output):
     if not video_stream or not audio_stream:
         failures.append('Missing video or audio stream')
     render_info=read_json(output/'render.json')
-    expected=sum(s['duration'] for s in speech['scenes'])+render_info.get('credits_seconds',0)+render_info.get('interlude_seconds',0);actual=float(metadata['format']['duration'])
+    expected=sum(s['duration'] for s in speech['scenes'])+render_info.get('credits_seconds',0)+render_info.get('interlude_seconds',0)+render_info.get('outro_seconds',0);actual=float(metadata['format']['duration'])
     if abs(actual-expected)>.5:
         failures.append('Video/audio duration mismatch')
     bad=[s['scene_id'] for s in speech['scenes'] if not s['verification']['accepted']]
@@ -43,7 +43,9 @@ def inspect(video,script,speech,assets,output):
     loudness=re.findall(r'\{\s*"input_i".*?\}',detection.stderr,re.S)
     measured=json.loads(loudness[-1]) if loudness else {}
     if not measured:failures.append('Could not measure final encoded soundtrack')
-    elif float(measured['input_tp'])>-.05:failures.append('Final soundtrack has insufficient clipping headroom')
+    else:
+        if float(measured['input_tp'])>-1.0:failures.append('Final soundtrack exceeds the -1 dBTP headroom limit')
+        if not -17.5<=float(measured['input_i'])<=-14.5:failures.append('Final soundtrack missed the narration loudness target')
     black=[float(x) for x in re.findall(r'black_duration:([\d.]+)',detection.stderr)]
     if any(x>1 for x in black):failures.append('Unexpected black interval over one second')
     unique=len({x['source_url'] for entry in assets.values() for x in entry['assets']})

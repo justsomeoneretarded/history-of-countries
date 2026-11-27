@@ -88,6 +88,12 @@ def build(script,directory,use_youtube=True,youtube_urls=(),fetch=True):
             contextual={**script,"scenes":[{**s,"asset_search_term":(s.get("location","").split(" and ")[0] or country_name(script["title"]))} for s in missing]}
             _merge(result,commons(contextual,directory/"context",{},max_queries=8))
         if use_youtube:_merge(result,youtube.bounded(script,directory/"youtube",youtube_urls))
+    # A present-day landscape is useful for the closing reflection, separate
+    # from the actual Pretoria agreement. It is never presented as war footage.
+    for scene in script["scenes"]:
+        if scene.get("chapter")=="Aftermath" and "2022" in scene.get("date_label","") and re.search(r"\b(?:ethiopia|country|unity)\b",scene["narration"],re.I):
+            landscapes=[a["id"] for a in result["assets"] if a.get("medium")=="modern_documentary_photo" and "simien" in a.get("subject","").casefold()]
+            result["scenes"][str(scene["scene_id"])]=list(dict.fromkeys(result["scenes"].get(str(scene["scene_id"]),[])+landscapes))
     # Every spoken scene must have real relevant media. No generated placeholder.
     missing=[s["scene_id"] for s in script["scenes"] if not result["scenes"].get(str(s["scene_id"]))]
     for asset in result["assets"]:

@@ -31,6 +31,10 @@ def render(script,speech,catalog,work,output,profile,api=None,full_script=None,r
     output=Path(output);output.mkdir(parents=True,exist_ok=True)
     work=Path(work);directory=work/"simple-render";directory.mkdir(parents=True,exist_ok=True)
     shots,storyboard=planning.make(api,script,speech,catalog,work)
+    outro=1.2 if profile=="cinematic" else 0.
+    if outro:
+        shots[-1]["frames"]+=round(outro*editing.PROFILES[profile][2])
+        shots[-1]["global_end"]+=outro
     save_json(output/"storyboard.json",storyboard);save_json(output/"timeline.json",shots)
     records={a["id"]:a for a in catalog["assets"]}
     paths=[]
@@ -41,10 +45,11 @@ def render(script,speech,catalog,work,output,profile,api=None,full_script=None,r
     silent=directory/"picture.mp4";editing.concat(paths,silent)
     width,height,fps=editing.PROFILES[profile]
     editing.captions(script,speech,output,width,height)
-    mixed,filters,timing=mix(speech,shots,work/"speech",directory,[],output,soundtrack_builder=compose)
+    mixed,filters,timing=mix(speech,shots,work/"speech",directory,[{"before_scene_id":None,"seconds":outro}] if outro else [],output,soundtrack_builder=compose)
     for name in ("music-credits.json","music-credits.txt","soundtrack.json"):
         shutil.copy2(directory/name,output/name)
-    expected=sum(s["duration"] for s in speech["scenes"])
+    narration_seconds=sum(s["duration"] for s in speech["scenes"])
+    expected=narration_seconds+outro
     final=output/"final.mp4"
     # Dates are already present in each visual part. Preserve the encoded
     # picture instead of recompressing the entire film a second time.
@@ -53,7 +58,7 @@ def render(script,speech,catalog,work,output,profile,api=None,full_script=None,r
       "-c:a","aac","-b:a","192k","-ar","48000","-movflags","+faststart",final,timeout=max(900,expected*3))
     used={s["asset_id"] for s in shots}
     save_json(output/"render.json",{"style":"simple-archival-editor","duration":duration(final),"profile":profile,
-      "voice":speech["voice"],"credits_seconds":0,"interlude_seconds":0})
+      "voice":speech["voice"],"credits_seconds":0,"interlude_seconds":0,"outro_seconds":outro,"source_crop":False,"image_animation":False})
     report=quality.inspect(final,script,speech,{"film":{"assets":[{"source_url":records[i]["source_url"]} for i in used]}},output)
     evidence=read_json(work/"research.json") if (work/"research.json").exists() else {"sources":[]}
     save_json(output/"sources.json",evidence)
@@ -64,11 +69,16 @@ def render(script,speech,catalog,work,output,profile,api=None,full_script=None,r
       "used_videos":len([i for i in used if records[i].get("medium") in planning.VIDEO]),
       "used_youtube_videos":len([i for i in used if records[i].get("provider")=="YouTube Creative Commons"])})
     full=profile=="cinematic" and (request or {}).get("phase")=="full"
-    if full and not .9*float(request["minutes"])*60<=expected<=1.1*float(request["minutes"])*60:raise PipelineError("The full narration missed the target duration")
+    if full and not .9*float(request["minutes"])*60<=narration_seconds<=1.1*float(request["minutes"])*60:raise PipelineError("The full narration missed the target duration")
     save_json(output/"delivery.json",{"upload_ready":bool(full and report["passed"]),"preview":not full,
       "duration_seconds":expected,"voice":speech["voice"],"technical_passed":report["passed"],
-      "visual_style":"Real photographs and licensed footage, smooth image motion and clean cuts",
+      "visual_style":"Complete historical images and real footage, phrase-aligned cuts, discreet dates and no animation",
+      "source_crop":False,"image_animation":False,"outro_seconds":outro,
       "youtube_published":False,"quality_scope":"Encoded-media, timing, speech-verification and provenance checks; no animation-score approval stage"})
+    save_json(output/"framing.json",{"source_crop":False,"image_animation":False,
+      "fit":"Complete foreground contained proportionally within 1920x1080; prefer native widescreen media",
+      "date_only_overlay":True,"shots":len(shots),
+      "video_continuity":"Consecutive footage cuts use increasing source offsets"})
     save_json(work/"progress.json",{"stage":"complete","complete":True,"output":str(output)})
     return final
 
