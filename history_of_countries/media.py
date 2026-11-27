@@ -83,6 +83,12 @@ def build(script,directory,use_youtube=True,youtube_urls=(),fetch=True):
         _merge(result,curated(script,directory))
         extra=commons(script,directory,result["scenes"])
         _merge(result,extra)
+        people=[]
+        for scene in script["scenes"]:
+            for name in ("Tewodros","Yohannes"):
+                if re.search(r"\b"+name+r"\b",scene["narration"],re.I):
+                    people.append({**scene,"asset_search_term":name+" Ethiopia portrait"})
+        if people:_merge(result,commons({**script,"scenes":people},directory/"people",{},max_queries=4))
         missing=[s for s in script["scenes"] if not result["scenes"].get(str(s["scene_id"]))]
         if missing:
             contextual={**script,"scenes":[{**s,"asset_search_term":(s.get("location","").split(" and ")[0] or country_name(script["title"]))} for s in missing]}

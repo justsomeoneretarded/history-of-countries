@@ -76,9 +76,13 @@ def render(script,speech,catalog,work,output,profile,api=None,full_script=None,r
       "source_crop":False,"image_animation":False,"outro_seconds":outro,
       "youtube_published":False,"quality_scope":"Encoded-media, timing, speech-verification and provenance checks; no animation-score approval stage"})
     save_json(output/"framing.json",{"source_crop":False,"image_animation":False,
-      "fit":"Complete foreground contained proportionally within 1920x1080; prefer native widescreen media",
+      "fit":"Complete foreground contained proportionally within the output frame; prefer native widescreen media",
+      "frame_size":[width,height],
       "date_only_overlay":True,"shots":len(shots),
       "video_continuity":"Consecutive footage cuts use increasing source offsets"})
+    if api is not None and full:
+        from .listening import review as listen
+        listen(api,final,speech,script,work,output)
     save_json(work/"progress.json",{"stage":"complete","complete":True,"output":str(output)})
     return final
 
