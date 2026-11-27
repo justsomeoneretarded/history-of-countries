@@ -61,6 +61,16 @@ def subject_words(scene, title=""):
 def historical_years(text):
     return {int(y) for y in re.findall(r"(?<!\d)(?:1\d{3}|20\d{2})(?!\d)",str(text))}
 
+def dated_event_evidence(info):
+    """Discard explicit upload/remaster dates; retain historical recording evidence."""
+    heading=str(info.get("title",""))
+    clean=re.sub(r"\b(?:uploaded|published|digitized|digitised|remastered|reuploaded|re-uploaded|colorized|colourized)\s*(?:in\s+)?(?:20\d{2})\b","",heading,flags=re.I)
+    years=historical_years(clean)
+    description=str(info.get("description",""))[:2400]
+    for match in re.finditer(r"\b(?:original footage|footage from|filmed in|recorded in|newsreel from|archive from|event date|original date)\s*[:\-]?\s*((?:1\d{3}|20\d{2}))\b",description,re.I):
+        years.add(int(match[1]))
+    return years
+
 def context(info,scene,title=""):
     """A filming/upload year is not automatically the period depicted."""
     heading=str(info.get("title",""))
@@ -72,7 +82,7 @@ def context(info,scene,title=""):
     explicitly_modern=bool(re.search(r"\b(?:4k|8k|walking|walkthrough|tour|travel|drone|visit|today|present.day)\b",text,re.I))
     location=words(scene.get("location",""))-words(country(title))-{"ethiopia","ethiopian","japan","japanese","country","highlands","highland","terrain"}
     if location&tokens and explicitly_modern:surviving=True
-    depicted=historical_years(heading)
+    depicted=dated_event_evidence(info)
     label=scene.get("date_label","")
     spoken=historical_years(label)
     period=scene_period(scene)
@@ -89,7 +99,8 @@ def context(info,scene,title=""):
     if country(title) and words(country(title))&tokens: score+=1
     if conflict: score-=20
     return {"score":score,"subject_terms":sorted(overlap),"period_conflict":conflict,
-            "presentation":mode,"title_years":sorted(depicted),"narrative_years":sorted(spoken),
+            "presentation":mode,"title_years":sorted(historical_years(heading)),
+            "candidate_event_years":sorted(depicted),"upload_date":info.get("upload_date"),"narrative_years":sorted(spoken),
             "needs_visual_review":True}
 
 def related(info,scene):
@@ -136,7 +147,10 @@ def plan_queries(api,script,directory,limits):
         try:
             raw=api.text(
                 "You are an archival footage researcher. For EVERY supplied story beat propose 6 distinct, short YouTube searches for REAL reusable moving footage. "
-                "Use concrete names, places, events, common spelling variants and relevant newsreel terms. "
+                 "Use concrete names, places, events, common spelling variants and relevant newsreel terms. "
+                "Vary genuine aliases and useful original-language search terms rather than making six near-identical English queries. "
+                "For Ethiopia, where relevant, consider Abyssinia, Abissinia, Ethiopie, Axum/Aksum and French or Italian archive terms. "
+                "For other countries use their own relevant names, never these Ethiopia examples. "
                 "For ancient history search present-day surviving buildings, objects and locations explicitly described in that passage. "
                 "Separate a modern camera's filming date from the historical period; do not demand medieval camera footage. "
                 "For named wars/famines seek actual period material, not generic tourism. Avoid other creators' explainer videos and static slideshows. "

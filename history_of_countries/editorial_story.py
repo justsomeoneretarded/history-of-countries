@@ -39,7 +39,7 @@ def write(api,title,brief,minutes,evidence,directory,name):
     target=sum(len(s["narration"].split()) for s in draft["scenes"])
     runtime_upper=round(minutes*float(os.getenv("SCRIPT_TARGET_WPM","160"))*1.1)
     if target>runtime_upper:raise PipelineError("The complete Ethiopia draft exceeds this requested duration; use the title/brief writer for a shorter film")
-    signature=key("spoken-director-edit-v2-story-stakes",draft,brief,minutes,SPEECH_STYLE,os.getenv("GEMINI_EDITOR_MODEL","gemini-3.5-flash-lite"))
+    signature=key("spoken-director-edit-v2-story-stakes",draft,brief,minutes,runtime_upper,SPEECH_STYLE,os.getenv("GEMINI_EDITOR_MODEL","gemini-3.5-flash-lite"))
     path=directory/"script.json"
     if path.exists():
         cached=read_json(path)

@@ -169,3 +169,16 @@ def test_multiple_excerpts_from_one_work_need_one_description_attribution():
     text=compact_attribution([{**common,"subject":"Troops marching"},{**common,"subject":"Vehicles arriving"}])
     assert text.count(common["source_url"])==1
     assert "Ethiopia archive newsreel" in text
+
+
+def test_historical_recording_date_is_distinct_from_upload_and_remaster_year():
+    passage=scene(asset_search_term="Ethiopian cavalry",date_label="1941")
+    info={"title":"Ethiopian cavalry archive uploaded 2024","description":"Original footage 1941.",
+          "upload_date":"20241102"}
+    assert youtube.related(info,passage)
+    match=search.context(info,passage)
+    assert match["candidate_event_years"]==[1941]
+    assert match["upload_date"]=="20241102"
+    assert not youtube.related(info,{**passage,"date_label":"1896"})
+    info["title"]="Ethiopian cavalry 1941 remastered 2024"
+    assert search.dated_event_evidence(info)=={1941}

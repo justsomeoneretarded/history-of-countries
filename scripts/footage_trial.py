@@ -19,7 +19,7 @@ def input_request():
         raw=event.get("inputs",{})
         return {"title":raw.get("title","The Entire History of Ethiopia"),
                 "brief":raw.get("brief","Tell Ethiopia's history through choices and consequences, ending with the 2022 Pretoria agreement."),
-                "minutes":float(raw.get("minutes",8.75))}
+                "minutes":float(raw.get("minutes",8.75)),"resume_run":raw.get("resume_run","")}
     paths=subprocess.check_output(["git","diff-tree","--no-commit-id","--name-only","-r","HEAD"],text=True).splitlines()
     paths=[p for p in paths if re.fullmatch(r"production/footage-tests/[A-Za-z0-9_.-]+\.json",p)]
     if len(paths)!=1:raise PipelineError("Change exactly one footage-test JSON per rehearsal commit")
@@ -66,8 +66,16 @@ def contact_sheet(assets,work):
     for i in range(0,len(data),8000):print("FOOTAGE_SHEET_CHUNK "+data[i:i+8000])
     print("FOOTAGE_SHEET_END")
 
+def configure():
+    request=input_request()
+    resume=str(request.get("resume_run",""))
+    if resume and not re.fullmatch(r"[0-9]+",resume):raise PipelineError("Numeric footage resume run ID required")
+    save_json("work/footage-input.json",request)
+    with open(os.environ["GITHUB_ENV"],"a") as env:env.write("FOOTAGE_RESUME_RUN="+resume+"\n")
+
 def main():
-    request=input_request();work=Path("work/footage");work.mkdir(parents=True,exist_ok=True)
+    request=read_json("work/footage-input.json") if Path("work/footage-input.json").exists() else input_request()
+    work=Path("work/footage");work.mkdir(parents=True,exist_ok=True)
     restore=Path("work/footage-restore")
     if restore.exists():shutil.copytree(restore,work,dirs_exist_ok=True)
     save_json(work/"input.json",request)
@@ -97,4 +105,6 @@ def main():
             for k,v in report.get("summary",{}).items():out.write(f"- **{k}**: {v}\n")
     if not report["assets"]:print("::warning::No usable inspected moving footage was acquired. This rehearsal is not an upload-ready film.",flush=True)
 
-if __name__=="__main__":main()
+if __name__=="__main__":
+    import sys
+    configure() if "--configure" in sys.argv else main()
