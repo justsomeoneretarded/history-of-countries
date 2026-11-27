@@ -64,12 +64,28 @@ def restore_ids(raw,aliases):
       if isinstance(row,dict) and isinstance(row.get("asset_ids"),list) else row for row in raw["scenes"]]}
 
 
+def _cuts(spoken,fps=30,frames=None):
+    frames=round(float(spoken["duration"])*fps) if frames is None else frames
+    if frames<=6*fps:return [0,frames]
+    boundaries=[0];words=spoken.get("words",[])
+    while frames-boundaries[-1]>6*fps:
+        start=boundaries[-1];desired=start+round(4.4*fps);candidates=[]
+        for i,word in enumerate(words):
+            end=round(float(word["end"])*fps)
+            if not start+3*fps<=end<=min(start+6*fps,frames-3*fps):continue
+            punct=bool(re.search(r"[.!?;:]$",word.get("word",word.get("text",""))))
+            pause=float(words[i+1]["start"])-float(word["end"]) if i+1<len(words) else 0
+            score=abs(end-desired)-(30 if punct else 14 if pause>.16 else 0)
+            candidates.append((score,end))
+        end=min(candidates)[1] if candidates else desired
+        boundaries.append(min(max(start+3*fps,end),frames-3*fps))
+    return boundaries+[frames]
+
 def _cues(spoken):
-    seconds=float(spoken["duration"]);count=max(1,math.ceil(round(seconds*30)/135))
-    words=spoken.get("words",[])
-    return [{"index":i,"text":" ".join(w.get("word",w.get("text","")) for w in words
-       if float(w["start"])<(i+1)*seconds/count and float(w["end"])>i*seconds/count)}
-       for i in range(count)]
+    cuts=_cuts(spoken);words=spoken.get("words",[])
+    return [{"index":i,"start":a/30,"end":b/30,"text":" ".join(w.get("word",w.get("text","")) for w in words
+       if float(w["start"])<b/30 and float(w["end"])>a/30)}
+       for i,(a,b) in enumerate(zip(cuts,cuts[1:]))]
 
 def _local_order(script,media,speech):
     records={a["id"]:a for a in media["assets"]};by_id={str(s["scene_id"]):s for s in speech["scenes"]}
@@ -87,6 +103,7 @@ def _local_order(script,media,speech):
                 value=3*len(terms&labels)
                 if military and asset.get("medium") in {"historical_artwork","archival_video"}:value+=4
                 if asset.get("medium") in VIDEO:value+=1
+                if asset.get("height") and asset.get("width",0)/asset["height"]>=1.55:value+=.4
                 if "portrait" in title and not terms&labels:value-=1
                 return value
             sequence.append(max(allowed,key=score))
@@ -95,8 +112,8 @@ def _local_order(script,media,speech):
 
 def make(api,script,speech,media,directory):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
-    fingerprint=key("simple-order-v4-compact-ids",script,[s["duration"] for s in speech["scenes"]],
-      [{k:a.get(k) for k in ("id","subject","date","context","sha256")} for a in media["assets"]],media["scenes"])
+    fingerprint=key("simple-order-v5-phrase-cuts-uncropped",script,[s["duration"] for s in speech["scenes"]],
+      [{k:a.get(k) for k in ("id","subject","date","context","sha256","width","height")} for a in media["assets"]],media["scenes"])
     path=directory/"storyboard.json"
     if path.exists():
         previous=read_json(path)
@@ -112,10 +129,10 @@ def make(api,script,speech,media,directory):
         payload={"scenes":[{"scene_id":str(s["scene_id"]),"narration":s["narration"],"date":s["date_label"],
           "shot_cues":_cues(spoken_by_id[str(s["scene_id"])]),
           "allowed_asset_ids":media["scenes"][str(s["scene_id"])]} for s in script["scenes"]],
-          "media":[{k:a.get(k) for k in ("id","subject","date","medium","context")} for a in media["assets"]]}
+          "media":[{k:a.get(k) for k in ("id","subject","date","medium","context","width","height")} for a in media["assets"]]}
         payload,aliases=compact_ids(payload)
         try:
-            raw=api.text("Return exactly one allowed asset ID per shot_cue, in cue order, for every passage. Repeats are allowed when the same subject continues. Match the words of each individual cue; do not just cycle portraits across an entire scene. Order only the allowed real images and footage for each passage. Choose what is being spoken about, in the order it is spoken. Prefer relevant moving footage where date and subject match; use portraits for named people and surviving objects/places for ancient history. Do not treat modern views as contemporary footage of ancient events. Do not invent IDs, narration, or visual content. Return only JSON.",payload,schema,max_output=14000,
+            raw=api.text("Return exactly one allowed asset ID per shot_cue, in cue order, for every passage. Repeats are allowed when the same subject continues. Match the words of each individual cue; do not just cycle portraits across an entire scene. Order only the allowed real images and footage for each passage. Choose what is being spoken about, in the order it is spoken. Prefer relevant moving footage where date and subject match. Prefer native widescreen views among equally relevant sources; all images are displayed whole, without artificial camera motion; use portraits for named people and surviving objects/places for ancient history. Do not treat modern views as contemporary footage of ancient events. Do not invent IDs, narration, or visual content. Return only JSON.",payload,schema,max_output=14000,
               model=os.getenv("GEMINI_PLANNER_MODEL","gemini-3.1-flash-lite"))
             raw=restore_ids(raw,aliases)
             orders,repairs=repair_order(raw,script,media,orders)
@@ -132,39 +149,28 @@ def make(api,script,speech,media,directory):
 def shots(script,speech,media,orders,fps=30):
     spoken={str(s["scene_id"]):s for s in speech["scenes"]}
     records={a["id"]:a for a in media["assets"]}
-    result=[];position=0.;cursor=0;previous=None
+    result=[];position=0.;cursor=0;video_offsets={}
     for scene in script["scenes"]:
         ident=str(scene["scene_id"]);audio=spoken[ident]
         seconds=float(audio["duration"]);end=round((position+seconds)*fps);frame_count=end-cursor
-        count=max(1,math.ceil(frame_count/(4.5*fps)))
-        ids=orders.get(ident,[])
+        cuts=_cuts(audio,fps,frame_count);ids=orders.get(ident,[])
         if not ids:raise PipelineError("Missing media for scene "+ident)
-        for index in range(count):
-            begin=cursor+round(frame_count*index/count);finish=cursor+round(frame_count*(index+1)/count)
-            length=(finish-begin)/fps
+        for index,(a,b) in enumerate(zip(cuts,cuts[1:])):
+            begin=cursor+a;finish=cursor+b;length=(b-a)/fps
             options=ids[index%len(ids):]+ids[:index%len(ids)]
-            available=[aid for aid in options if records[aid].get("medium") not in VIDEO or float(records[aid].get("duration_seconds",records[aid].get("duration",0)))>=length-.02]
-            if not available:raise PipelineError("Approved video excerpts are shorter than the requested shot")
-            aid=available[0];previous=aid
+            options=list(dict.fromkeys(options+media.get("scenes",{}).get(ident,[])))
+            def fresh(aid):
+                asset=records[aid]
+                return asset.get("medium") not in VIDEO or float(asset.get("duration_seconds",asset.get("duration",0)))-video_offsets.get(aid,0)>=length-.02
+            available=[aid for aid in options if fresh(aid)]
+            if not available:raise PipelineError("Approved excerpts do not cover this passage without restarting the same footage")
+            aid=available[0];source_start=video_offsets.get(aid,0)
+            if records[aid].get("medium") in VIDEO:video_offsets[aid]=source_start+length
             result.append({"scene_id":scene["scene_id"],"asset_id":aid,"global_start":begin/fps,
-              "global_end":finish/fps,"frames":finish-begin,"chapter":scene["chapter"],
+              "global_end":finish/fps,"frames":b-a,"chapter":scene["chapter"],
               "narration_context":scene["narration"],"year_label":scene["date_label"],
-              "motion":("in","left","out","right")[(len(result))%4],
-              "music_mood":"somber" if scene.get("bg_music_mood")=="reflective" else "tense" if scene.get("bg_music_mood")=="tense" else "neutral",
-              "events":[],"source_start":0.})
+              "motion":"hold","source_crop":False,"side_fill":"subtle",
+              "music_mood":"neutral" if scene["chapter"]=="Roots" else "somber" if scene.get("bg_music_mood")=="reflective" else "tense",
+              "events":[],"source_start":source_start})
         position+=seconds;cursor=end
-    # Keep a continuous camera when adjacent cues deliberately use the same
-    # photograph. Separate encoded parts must not restart its pan/zoom.
-    index=0
-    while index<len(result):
-        stop=index+1
-        while stop<len(result) and result[stop]["scene_id"]==result[index]["scene_id"] and result[stop]["asset_id"]==result[index]["asset_id"] and records[result[index]["asset_id"]].get("medium") not in VIDEO:
-            stop+=1
-        if stop-index>1:
-            total=sum(s["frames"] for s in result[index:stop]);offset=0
-            for shot in result[index:stop]:
-                shot["motion"]=result[index]["motion"]
-                shot["motion_offset_frames"]=offset;shot["motion_total_frames"]=total
-                offset+=shot["frames"]
-        index=stop
     return result

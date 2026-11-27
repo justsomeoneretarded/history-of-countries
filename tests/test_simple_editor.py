@@ -37,15 +37,14 @@ def test_frame_clock_covers_narration_without_cumulative_drift():
     assert sum(s["frames"] for s in result)==round(24*17.973*30)
     assert result[0]["global_start"]==0
     assert all(a["global_end"]==b["global_start"] for a,b in zip(result,result[1:]))
-    assert all(3<=s["frames"]/30<=4.5 for s in result)
+    assert all(3<=s["frames"]/30<=6 for s in result)
 
-def test_image_motion_uses_fractional_smooth_coordinates_and_no_random_shake():
-    first=editing.pose(0,"in");middle=editing.pose(.5,"in");last=editing.pose(1,"in")
-    assert first[0]<middle[0]<last[0]
-    assert middle[0]==pytest.approx(1.0225)
-    positions=[editing.pose(i/149,"left")[1] for i in range(150)]
-    assert all(a>b for a,b in zip(positions,positions[1:]))
-    assert len(set(positions))==150
+def test_uncropped_fit_keeps_all_source_edges_at_every_aspect_ratio():
+    for source in ((600,1200),(1200,600),(1920,1080),(800,800)):
+        x,y,w,h=editing.fit_rect(source,(1920,1080))
+        assert x>=0 and y>=0 and x+w<=1920 and y+h<=1080
+        assert w/h==pytest.approx(source[0]/source[1],rel=.003)
+        assert w==1920 or h==1080
 
 def test_simple_request_defaults_and_untrusted_input_validation():
     request=validate_request({"title":"Japan","brief":"Explain political change across centuries."})
@@ -73,7 +72,7 @@ def test_actual_image_and_video_clips_encode_and_join_without_black_gaps(tmp_pat
     start=tmp_path/"first.png";end=tmp_path/"later.png"
     ffmpeg("-i",still,"-vf","select=eq(n\\,0)","-frames:v","1",start)
     ffmpeg("-i",still,"-vf","select=eq(n\\,50)","-frames:v","1",end)
-    assert np.mean(np.abs(np.asarray(Image.open(start),dtype=float)-np.asarray(Image.open(end),dtype=float)))>.2
+    assert np.mean(np.abs(np.asarray(Image.open(start),dtype=float)-np.asarray(Image.open(end),dtype=float)))<.35
 
 
 def test_youtube_search_uses_the_reuse_filter_but_still_requires_result_license():
@@ -84,18 +83,13 @@ def test_youtube_search_uses_the_reuse_filter_but_still_requires_result_license(
     assert not youtube.reusable({"id":"tn2ehtuk1Gk","title":"creative commons footage"})
 
 
-def test_repeated_photo_holds_one_continuous_camera_across_edit_boundaries():
+def test_repeated_photo_is_held_whole_without_a_camera_reset():
     scene={"scene_id":1,"chapter":"Roots","narration":"The same subject continues.","date_label":"1900"}
     speech={"scenes":[{"scene_id":1,"duration":12.0}]}
     rows=planning.shots({"scenes":[scene]},speech,{"assets":[{"id":"A","medium":"historical_photo"}]},{"1":["A","A","A"]})
-    assert len(rows)==3
-    assert len({s["motion"] for s in rows})==1
-    frames=sum(s["frames"] for s in rows)
-    for previous,following in zip(rows,rows[1:]):
-        before=(previous["motion_offset_frames"]+previous["frames"]-1)/(frames-1)
-        after=following["motion_offset_frames"]/(frames-1)
-        assert after-before==pytest.approx(1/(frames-1))
-
+    assert len(rows)>=2
+    assert all(s["motion"]=="hold" and not s["source_crop"] for s in rows)
+    assert sum(s["frames"] for s in rows)==360
 
 def test_restoration_word_never_moves_a_1941_photo_into_medieval_history():
     from history_of_countries.documentary_assets import matching_assets
@@ -124,3 +118,24 @@ def test_compact_transport_ids_round_trip_without_approving_unknown_ids():
     assert payload["media"][0]["id"]=="archive-long-sha"
     decoded=planning.restore_ids({"scenes":[{"scene_id":"1","asset_ids":["A2","A999"]}]},aliases)
     assert decoded["scenes"][0]["asset_ids"]==["photo-long-sha","A999"]
+
+
+def test_important_portrait_edges_survive_real_frame_composition():
+    source=Image.new("RGB",(100,200),"#997755");draw=ImageDraw.Draw(source)
+    draw.rectangle((0,0,15,15),fill="red")
+    draw.rectangle((84,0,99,15),fill="green")
+    draw.rectangle((0,184,15,199),fill="blue")
+    draw.rectangle((84,184,99,199),fill="yellow")
+    result=editing.complete_image(source,(320,180),"plain")
+    x,y,w,h=editing.fit_rect(source.size,result.size)
+    for point,color in [((x+3,y+3),(255,0,0)),((x+w-4,y+3),(0,128,0)),
+                        ((x+3,y+h-4),(0,0,255)),((x+w-4,y+h-4),(255,255,0))]:
+        assert max(abs(a-b) for a,b in zip(result.getpixel(point),color))<15
+
+def test_consecutive_footage_shots_continue_forward_instead_of_replaying_the_start():
+    scene={"scene_id":1,"chapter":"Hook","narration":"The actual footage continues.","date_label":"1935"}
+    speech={"scenes":[{"scene_id":1,"duration":12.0}]}
+    catalogue={"assets":[{"id":"V","medium":"video","duration_seconds":16}],"scenes":{"1":["V"]}}
+    rows=planning.shots({"scenes":[scene]},speech,catalogue,{"1":["V"]})
+    assert rows[0]["source_start"]==0
+    assert all(b["source_start"]==a["source_start"]+a["frames"]/30 for a,b in zip(rows,rows[1:]))

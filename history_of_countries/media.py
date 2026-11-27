@@ -5,6 +5,7 @@ import hashlib
 import re
 import time
 import requests
+from PIL import Image
 from .core import ROOT,PipelineError,key,read_json,save_json
 from .documentary_assets import catalog,_download_image
 from .generic_assets import subject_terms,GENERIC_SUBJECT
@@ -91,6 +92,8 @@ def build(script,directory,use_youtube=True,youtube_urls=(),fetch=True):
     missing=[s["scene_id"] for s in script["scenes"] if not result["scenes"].get(str(s["scene_id"]))]
     for asset in result["assets"]:
         asset["sha256"]=hashlib.sha256(Path(asset["path"]).read_bytes()).hexdigest()
+        if asset.get("medium") not in {"video","archival_video","modern_documentary_video"}:
+            with Image.open(asset["path"]) as picture:asset["width"],asset["height"]=picture.size
     save_json(directory/"media.json",result)
     if missing:raise PipelineError("No relevant reusable media for scenes "+", ".join(map(str,missing))+". See work/media/media.json; add licensed URLs or refine those searches.")
     return result
