@@ -6,7 +6,6 @@ on:
   pull_request:
 permissions:
   contents: read
-  actions: read
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -29,28 +28,4 @@ jobs:
           for path in Path('.github/workflows').glob('*.yml'):
               document=yaml.safe_load(path.read_text())
               assert document.get('jobs') and document.get('name'), path
-          PY
-
-  inspect-speech:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: countries-checkpoint
-          run-id: 46051582857
-          repository: justsomeoneretarded/history-of-countries
-          github-token: ${{ github.token }}
-          path: checkpoint
-      - name: Inspect actual rejected speech
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          for path in sorted(Path('checkpoint/speech').glob('*-asr-*.json')):
-              value=json.loads(path.read_text())
-              check=value.get('verification',{})
-              if not check.get('accepted'):
-                  print('SPEECH_DIAGNOSTIC '+json.dumps({'file':path.name,'verification':check,
-                    'first_words':value.get('words',[])[:30]},ensure_ascii=False))
           PY

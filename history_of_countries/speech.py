@@ -9,9 +9,10 @@ from .core import ROOT, PipelineError, duration, key, save_json, read_json
 def clean_words(text):
     return re.findall(r"[\w’'-]+", text.casefold())
 
-def transcript(audio, recognizer):
-    segments, _ = recognizer.transcribe(str(audio), language='en', beam_size=3, word_timestamps=True,
-        vad_filter=True, condition_on_previous_text=False)
+def transcript(audio, recognizer, vocabulary=None):
+    hints={"initial_prompt":"Names and places: "+vocabulary} if vocabulary else {}
+    segments, _ = recognizer.transcribe(str(audio), language='en', beam_size=5, word_timestamps=True,
+        vad_filter=True, condition_on_previous_text=False,**hints)
     cues, words = [], []
     for segment in segments:
         cues.append({'start':float(segment.start),'end':float(segment.end),'text':segment.text.strip()})
