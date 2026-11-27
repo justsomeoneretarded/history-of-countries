@@ -57,7 +57,8 @@ def render_shot(asset,shot,directory,profile="cinematic"):
     if output.exists() and abs(duration(output)-expected)<.05:return output
     if asset.get("medium") in VIDEO:
         width,height,fps=PROFILES[profile]
-        filters=f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=0x111a20,setsar=1,fps={fps},tpad=stop_mode=clone:stop_duration=0.04,format=yuv420p"
+        hold=float(shot.get("outro_hold_seconds",0))+.04
+        filters=f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=0x111a20,setsar=1,fps={fps},tpad=stop_mode=clone:stop_duration={hold},format=yuv420p"
         inputs=["-ss",str(shot.get("source_start",0)),"-i",asset["path"]]
         year=str(shot.get("year_label","")).strip()
         if year:

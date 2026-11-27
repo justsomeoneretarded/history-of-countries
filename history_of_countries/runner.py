@@ -33,6 +33,7 @@ def render(script,speech,catalog,work,output,profile,api=None,full_script=None,r
     shots,storyboard=planning.make(api,script,speech,catalog,work)
     outro=1.2 if profile=="cinematic" else 0.
     if outro:
+        shots[-1]["outro_hold_seconds"]=outro
         shots[-1]["frames"]+=round(outro*editing.PROFILES[profile][2])
         shots[-1]["global_end"]+=outro
     save_json(output/"storyboard.json",storyboard);save_json(output/"timeline.json",shots)
