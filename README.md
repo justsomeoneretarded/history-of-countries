@@ -1,65 +1,84 @@
 # History of Countries
 
-A simple history-video runner for GitHub Actions. Give it a **title and short brief**, choose a Gemini voice, and receive an edited video, thumbnail, description and subtitles.
+Give GitHub Actions a **title and short brief**, choose a Gemini voice, and download a complete history video with its YouTube thumbnail, title, description and subtitles.
 
-This version uses **real photographs, historical artwork, and reusable video excerpts** with smooth image motion and clean cuts. It has no character rigs, procedural animated scenes, map-animation engine, or animation-score approval loop.
+The production style is **real historical images and footage, natural storytelling, clean cuts and minimal text**. Source images remain whole and keep their proportions. Widescreen sources are preferred; occasional portraits use subtle side fill. There are no character animations, animated maps, artificial image pans or zooms, branding overlays or chapter cards.
 
 ## Run a video
 
-1. Under **Settings → Secrets and variables → Actions**, add **gemini_api_key**.
+1. Add the repository Actions secret **gemini_api_key**.
 2. Open **Actions → Create a simple history video → Run workflow**.
-3. Enter your title and brief. Charon is the default voice; the other listed Gemini voices are optional. The default target is 8.75 minutes.
-4. When the workflow finishes successfully, download the **countries-video** artifact. A completed full export has **upload_ready: true** in delivery.json. Use final.mp4, thumbnail.jpg, title.txt, description.txt and captions.srt for YouTube.
+3. Enter the title and brief. Charon is the default narrator. Choose **auto** to compare actual Puck and Charon recordings for intelligibility, naturalness and delivery.
+4. Download **countries-video** after a successful full run. A finished full export has **upload_ready: true** in delivery.json.
 
-The workflow does not publish to YouTube. A preview uses the first three consecutive scenes and is labeled as a preview in delivery.json.
+Use final.mp4, thumbnail.jpg, title.txt, description.txt and captions.srt for YouTube. The runner does not publish to YouTube.
+
+The default target is 8.75 minutes; supported targets are 0.5–10 minutes. A preview contains the first three consecutive scenes and is explicitly marked as a preview.
+
+## Story and voice
+
+The five internal chapters are Hook, Roots, Catalyst, Turning Point and Aftermath. Narration starts inside a consequential event, follows decisions and consequences through the centuries, and pays off the opening at the end. The writer rejects repeated padding without forcing every paragraph into the same short-sentence pattern.
+
+The refined Ethiopia production has a complete original director's draft in episodes/ethiopia-story.json. Gemini makes one bounded edit for spoken language; the chronology, scene IDs, source metadata and chapter intake limits remain fixed. Other subjects use the Gemini chapter writer and the same narration style.
+
+Gemini 3.8 Flash TTS records complete chapters, with no more than 450 words in one intake. If its free daily quota is exhausted, an unrecorded chapter can use the verified free Gemini 3.8 Flash Lite TTS variant with the same prebuilt voice; accepted chapters remain intact. Transcript-assisted checks verify spoken completeness and split recordings only between words. The recording is never sped up or stretched to reach a target duration.
+
+Chapter-level audio processing uses a 70 Hz high-pass, gentle presence EQ, light compression and measured normalization. Licensed instrumental music is ducked beneath speech, with silence for difficult passages. The final mix targets −16 LUFS and −1.5 dBTP. Opening, middle and ending excerpts from the actual final soundtrack receive an additional Gemini listening report when available.
+
+## Pictures, editing and text
+
+- The entire foreground image is contained in the output frame, preserving its edges and aspect ratio.
+- Cuts follow phrase endings or pauses where possible, usually every 3–6 seconds.
+- Consecutive excerpts advance through the original footage instead of replaying its opening.
+- The only regular overlay is a small, high-contrast date in a consistent corner.
+- Subtitles are supplied separately as SRT; words do not flash over the picture.
+- The ending holds briefly after the last line, with no padded credits or subscription screen.
+
+Real media comes from identified Internet Archive newsreels, Wikimedia Commons, museum open-access collections and optional reusable YouTube clips. Every work retains its provenance and license. A modern view of a surviving place is distinguished from contemporary evidence of a historical event.
+
+YouTube discovery requires an explicit Creative Commons attribution license plus matching subject and date. Optional source URLs can be supplied in the workflow. media-discovery.json reports what was actually selected; unavailable or unsuitable clips are not substituted with unrelated material.
+
+## What creates each part
+
+| Part | Tools and models |
+| --- | --- |
+| Research and chapter writing | Source extracts, Gemini 3.1 Flash Lite |
+| Ethiopia spoken edit | Original director draft, Gemini 3.5 Flash Lite |
+| Narration | Gemini 3.8 Flash TTS; free Flash Lite TTS quota recovery; selectable prebuilt voices |
+| Voice comparison | Actual recordings, faster-whisper completeness checks, Gemini 3.5 Flash Lite listening |
+| Media order | Gemini 3.1 Flash Lite using compact approved-media IDs and word-timed cues |
+| Images and editing | Pillow, FFmpeg; no generated animation |
+| Audio | FFmpeg mastering and ducking, licensed Scott Buckley instrumentals |
+| Thumbnail and upload text | Authentic image composition, Pillow, Gemini 3.5 Flash Lite |
+| Delivery checks | Full media decode, frame/audio timing, loudness, speech, framing and package limits |
+
+Source components and their pinned revision are listed in REUSED_FROM.md.
+
+## Free-tier operation and recovery
+
+These are application guardrails, rather than universal provider quotas:
+
+- Requests start at least 65 seconds apart, with bounded network retries.
+- The input guard is approximately 40,000 tokens; media ordering allows 14,000 output tokens, including model reasoning.
+- Accepted writing, voice takes, alignments and rendered clips are checkpointed.
+- The main TTS model reported a 10-request daily free limit for this key on 27 November 2026. Quotas vary by model/project. Accepted work is preserved when quota stops generation.
+- Optional editing or metadata requests can use the approved local material when unavailable.
+- No paid model fallback is used.
+
+To resume, provide the saved run ID and countries-checkpoint in the workflow. A History-of-X director-audio checkpoint can also be imported. Animation programs are omitted.
+
+## Output and verification
+
+A full export is 1920×1080 at 30 fps, H.264 video and AAC stereo audio. Delivery includes the MP4, thumbnail, title, description, captions, script, full credits and measured reports.
+
+The test suite currently passes 91 checks. Tests encode and inspect actual media using synthetic fixtures. They verify transport and editing contracts, not human pronunciation or audience retention. Real productions also record speech-completeness measurements, actual voice comparisons and sampled listening observations.
+
+The previous validated Ethiopia edition is recorded in VALIDATION.json. The new story, voice and complete-image refinement is being produced and will have its own measured delivery record.
 
 For local use:
 
     pip install -e '.[alignment]'
     export GEMINI_API_KEY='your key'
-    history-countries --title "The Entire History of Japan" --brief "Explain how trade, rival rulers and political reforms changed who held power."
+    history-countries --title "The Entire History of Japan" --brief "Explain how rulers, trade and political reforms changed who held power."
 
-FFmpeg, Cairo and DejaVu fonts are required. The Actions workflow installs maintained Ubuntu packages.
-
-## What it keeps
-
-- The original five-chapter Gemini writer and its accepted chapter checkpoints.
-- Gemini 3.8 Flash TTS, conversational narration, speech-completeness checks, and transcript-assisted timing.
-- Licensed historical-media records, museum discovery, restrained licensed music, narration-aware ducking and encoded-media checks.
-- A discreet year indicator, optional subtitles, and attribution in the description and credits files.
-
-The source components and pinned revision are listed in REUSED_FROM.md. Chatterbox, Qwen/Ollama, character animation, old visual experiments and their workflows are omitted.
-
-## Images and footage
-
-Gemini chooses approved media for short cues taken from the actual spoken-word timing. Repeated photographs keep one continuous camera movement across edit boundaries. The editor changes shots about every 3–4.5 seconds. The year is rendered into each shot, and final assembly preserves the encoded picture instead of recompressing the whole film. Cairo applies fractional image transforms, avoiding integer-rounded pan/zoom jumps.
-
-YouTube discovery accepts only videos with an explicit Creative Commons attribution reuse license and a matching subject/date. Optional source URLs can be provided in the workflow. Standard-license, private and DRM material is excluded. YouTube sometimes blocks hosted-runner extraction; the runner records the result and uses available licensed archive imagery/footage. **media-discovery.json reports how many YouTube clips were actually used.**
-
-Other sources include identified Internet Archive newsreels, Wikimedia Commons and museum open-access collections. Current views of surviving places are distinguished from contemporaneous historical evidence in the media records. Missing media is reported; no unrelated placeholder is generated.
-
-The initial Ethiopia collection and licensed music are fetched from a pinned History-of-X revision and checked against SHA-256 records.
-
-## Models and limits
-
-The defaults are Gemini 3.1 Flash Lite for writing and one compact asset-order request, Gemini 3.8 Flash TTS for speech, and Gemini 3.5 Flash Lite for upload metadata. No paid model fallback is used.
-
-Requests start at least 65 seconds apart. Network retries are bounded. Application limits include an approximate 40,000-token input budget and a 14,000-token output cap for image ordering; these are guardrails, not universal free-tier API quotas. Speech is generated by chapter with a maximum intake of 450 words. The app preserves accepted chapters, speech and rendered clips. Model quotas depend on the key/project; HTTP 429 stops required generation and preserves the checkpoint. Optional shot ordering and metadata can use approved local data when their model is unavailable.
-
-To resume, supply the saved run ID and countries-checkpoint in the workflow. A History-of-X narration checkpoint can also be imported: choose its repository, run ID and director-audio artifact. Only writing/narration files are retained; animation caches are discarded.
-
-## Output and validation
-
-A full export is 1920×1080, 30 fps, H.264 video and AAC stereo audio. It includes final.mp4, thumbnail.jpg, title.txt, description.txt, captions.srt, script.txt, sources-and-credits.txt, quality.json and delivery.json.
-
-Checks cover actual media decoding, frame/audio timing, verified speech, clipping headroom, black gaps and YouTube metadata limits. The test suite also encodes actual moving-image and footage cuts. Synthetic encoding tests do not certify Gemini pronunciation or artistic quality.
-
-The validated Ethiopia export completed successfully on 26 November 2026: **8:28.64, 1080p at 30 fps, Gemini Charon narration**, with the 77-test suite and full encoded-media checks passing. The YouTube package has a 60-character title, a 4,351-character description with all 17 required visual attributions, and a 179 KB thumbnail.
-
-- [Download the complete Ethiopia video and upload files](https://github.com/justsomeoneretarded/history-of-countries/actions/runs/45815732315/artifacts/15114947848).
-- [Inspect the successful production run](https://github.com/justsomeoneretarded/history-of-countries/actions/runs/45815732315).
-- [Run another video](https://github.com/justsomeoneretarded/history-of-countries/actions/workflows/video.yml).
-
-This export uses 41 image files and two licensed Internet Archive footage excerpts. YouTube searches returned candidates, but none passed the subject/date checks, so no YouTube clips were included. Actual usage is recorded in media-discovery.json.
-
-Gemini selected the images using compact transport IDs; the successful planning response used 921 output tokens. Image/date filtering prevents a modern archive photograph from illustrating a medieval dynastic restoration. Repeated author/license credits are grouped while retaining every work's title and source. The complete reference and credit file is included in the download. See [VALIDATION.json](VALIDATION.json) for the measured delivery results.
+FFmpeg and DejaVu fonts are required. The Actions workflow installs its system dependencies.
