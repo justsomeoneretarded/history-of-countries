@@ -75,7 +75,7 @@ The test suite verifies transport and editing contracts, including footage-selec
 
 The previous Ethiopia edition completed successfully on **27 November 2026**: **9:02, 1920×1080 at 30 fps, Charon narration**, and a 1,488-word original story. All **91 tests** and full output checks passed.
 
-- [Download the refined video, upload files and voice-comparison samples](https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46054314537/artifacts/15226312314).
+- [Download the previous 9:02 export and its upload files](https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46054314537/artifacts/15226312314).
 - [Inspect the successful full production](https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46054314537).
 - [Run another video](https://github.com/justsomeoneretarded/history-of-countries/actions/workflows/video.yml).
 
@@ -95,7 +95,7 @@ FFmpeg and DejaVu fonts are required. The Actions workflow installs its system d
 
 YouTube research now plans scene-specific queries in fair rounds: up to 200 queries × 8 results (1,600 result slots, versus 15 previously). These are capacity limits, not a promise of 1,600 distinct usable videos. Flat search is followed by up to 96 metadata inspections and 16 actual Gemini video reviews. Only explicit reusable rights are accepted. Modern filming/upload dates are distinguished from the historical subject; modern views of named surviving places and objects can illustrate earlier history.
 
-Gemini inspects several source windows and selects exact 6–30-second intervals tied to quoted narration. Slideshows, unrelated scenery, branding and period mismatches are rejected. Direct YouTube video input has a downloaded-preview fallback. Search results, metadata, video decisions and accepted excerpts are checkpointed. Hosted-runner extraction failures and quota exhaustion remain explicit in discovery reports.
+Gemini inspects several source windows and selects exact 6–30-second intervals tied to quoted narration. Slideshows, unrelated scenery, branding and period mismatches are rejected. Direct YouTube video input has a downloaded-preview fallback. If FFmpeg range downloading fails, a native whole-source download can be cut locally, capped at 30 minutes, 180 MiB and three minutes of download time; full source movies are removed from the checkpoint afterward. Search results, metadata, video decisions and accepted excerpts are checkpointed. Hosted-runner extraction failures and quota exhaustion remain explicit in discovery reports.
 
 The default full production requires at least 25% actual moving-footage time in the edited timeline when YouTube research is enabled. A film below that level remains a saved draft with `upload_ready: false`, a `needs_sourcing` status and an explanatory sourcing report. Repeated-image holds and excessive frame fill are reported separately. The previous 9:02 Ethiopia export does not meet this new footage standard.
 

@@ -197,3 +197,34 @@ def test_failed_discovery_process_cannot_reuse_footage_from_another_script(tmp_p
     assert result["assets"]==[]
     assert result["script_fingerprint"]==key(script)
     assert result["provider_status"][-1]["reason"]=="extractor_process_failed"
+
+
+def test_native_whole_download_fallback_cuts_approved_interval_and_reuses_source(tmp_path):
+    import shutil
+    from history_of_countries.core import duration
+    raw=tmp_path/"original.mp4"
+    ffmpeg("-f","lavfi","-i","testsrc2=size=640x360:rate=15","-t","30","-an","-c:v","libx264","-pix_fmt","yuv420p",raw)
+    class Native:
+        whole_calls=0
+        def __init__(self,settings):self.settings=settings
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def download(self,urls):
+            if "download_ranges" in self.settings:raise PipelineError("fixture FFmpeg range 403")
+            Native.whole_calls+=1
+            path=Path(self.settings["outtmpl"].replace("%(ext)s","mp4"))
+            path.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(raw,path)
+    info={"id":"abcdefghijk","duration":30}
+    a=youtube.download_excerpt(info,10,18,tmp_path/"clips/a.mp4",ydl_factory=Native)
+    b=youtube.download_excerpt(info,20,28,tmp_path/"clips/b.mp4",ydl_factory=Native)
+    assert duration(a)==pytest.approx(8,abs=.1)
+    assert duration(b)==pytest.approx(8,abs=.1)
+    assert Native.whole_calls==1
+    assert read_json(a.with_suffix(".acquisition.json"))["method"]=="native_whole_download_then_local_cut"
+
+
+def test_historical_place_aliases_survive_foreign_language_discovery():
+    info={"title":"Axum churches walking tour 2024","description":"Abyssinia monuments"}
+    passage=scene(asset_search_term="Aksum churches monuments",location="Aksum")
+    assert youtube.related(info,passage)
+    assert search.words("Adoua Adowa Adwa")=={"adwa"}

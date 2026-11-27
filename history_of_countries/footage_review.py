@@ -151,7 +151,7 @@ def inspect(api,info,scenes,directory,download):
              "review_windows":[{"source_start":a,"source_end":b} for a,b in windows],
              "scenes":[{k:s.get(k) for k in ("scene_id","narration","date_label","location","asset_search_term")} for s in scenes]}
     if not windows:raise PipelineError("Candidate is too short for inspection")
-    parts=[{"fileData":{"mimeType":"video/mp4","fileUri":"https://www.youtube.com/watch?v="+info["id"]},
+    parts=[{"fileData":{"fileUri":"https://www.youtube.com/watch?v="+info["id"]},
             "videoMetadata":{"fps":1,"startOffset":str(round(a,3))+"s","endOffset":str(round(b,3))+"s"}} for a,b in windows]
     remote_error=None
     try:

@@ -50,7 +50,10 @@ class Limits:
 
 def words(text):
     folded=unicodedata.normalize("NFKD",str(text)).encode("ascii","ignore").decode().casefold()
-    return set(re.findall(r"[a-z]{3,}",folded))
+    aliases={"axum":"aksum","adowa":"adwa","adoua":"adwa","adua":"adwa","gonder":"gondar",
+             "abyssinia":"ethiopia","abissinia":"ethiopia","ethiopie":"ethiopia","ethiopian":"ethiopia",
+             "taitu":"taytu","betoul":"betul","ucciali":"wuchale","uccialli":"wuchale"}
+    return {aliases.get(token,token) for token in re.findall(r"[a-z]{3,}",folded)}
 
 def country(title):
     return re.sub(r"^(?:the\s+)?(?:entire\s+)?history\s+of\s+","",title,flags=re.I).split(":")[0].strip()

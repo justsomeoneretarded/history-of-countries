@@ -44,6 +44,7 @@ def _options():
 def download_excerpt(info,start,end,target,height=1080,ydl_factory=None):
     from yt_dlp import YoutubeDL
     from yt_dlp.utils import download_range_func
+    from .core import ffmpeg
     target=Path(target);target.parent.mkdir(parents=True,exist_ok=True)
     if target.exists():
         try:
@@ -52,25 +53,54 @@ def download_excerpt(info,start,end,target,height=1080,ydl_factory=None):
         except (PipelineError,ValueError,KeyError):pass
         target.unlink(missing_ok=True)
     factory=ydl_factory or YoutubeDL
-    settings={**_options(),"skip_download":False,
-              "format":f"bestvideo[ext=mp4][height<={height}]/best[ext=mp4][height<={height}]/bestvideo[height<={height}]/best[height<={height}]",
+    selector=lambda cap:f"bestvideo[ext=mp4][height<={cap}]/best[ext=mp4][height<={cap}]/bestvideo[height<={cap}]/best[height<={cap}]"
+    settings={**_options(),"skip_download":False,"format":selector(height),
               "outtmpl":str(target.with_suffix(".%(ext)s")),"merge_output_format":"mp4",
               "download_ranges":download_range_func(None,[(start,end)]),"force_keyframes_at_cuts":True,
               "external_downloader_args":{"ffmpeg_i":["-rw_timeout","15000000"]}}
-    with factory(settings) as ydl:ydl.download(["https://www.youtube.com/watch?v="+info["id"]])
-    actual=next((p for p in target.parent.glob(target.stem+".*") if p.suffix in {".mp4",".webm",".mkv"} and p.stat().st_size>0),None)
-    if actual is None:raise PipelineError("YouTube did not produce an excerpt")
-    if actual.stat().st_size>180*1024*1024:
-        actual.unlink();raise PipelineError("Excerpt exceeded the local size budget")
-    if actual!=target:
-        from .core import ffmpeg
-        ffmpeg("-i",actual,"-an","-c:v","libx264","-preset","veryfast","-crf","20","-pix_fmt","yuv420p",target,timeout=180)
-        actual.unlink()
+    method="range_download";range_error=None
+    try:
+        with factory(settings) as ydl:ydl.download(["https://www.youtube.com/watch?v="+info["id"]])
+        actual=next((p for p in target.parent.glob(target.stem+".*") if p.suffix in {".mp4",".webm",".mkv"} and p.stat().st_size>0),None)
+        if actual is None:raise PipelineError("YouTube did not produce an excerpt")
+        if actual.stat().st_size>180*1024*1024:raise PipelineError("Excerpt exceeded the local size budget")
+        if actual!=target:
+            ffmpeg("-i",actual,"-an","-c:v","libx264","-preset","veryfast","-crf","20","-pix_fmt","yuv420p",target,timeout=180)
+            actual.unlink()
+        meta=probe(target)
+        if float(meta["format"]["duration"])<end-start-.35:raise PipelineError("Range excerpt is truncated")
+    except Exception as exc:
+        range_error=type(exc).__name__
+        # yt-dlp's native whole-file path can work when FFmpeg HTTP range requests fail.
+        # Bound duration, bytes and elapsed download time independently.
+        if not 6<=float(info.get("duration") or 0)<=1800:
+            raise PipelineError("Range download unavailable; source exceeds whole-file fallback duration") from None
+        target.unlink(missing_ok=True)
+        cache=target.parent.parent/"source-cache";cache.mkdir(parents=True,exist_ok=True)
+        source=next((p for p in cache.glob(info["id"]+".*") if p.suffix in {".mp4",".webm",".mkv"} and p.stat().st_size>0),None)
+        if source is None:
+            begun=time.monotonic()
+            def bounded_progress(event):
+                if event.get("downloaded_bytes",0)>180*1024*1024 or time.monotonic()-begun>180:
+                    raise PipelineError("Whole-source fallback exceeded its byte/time budget")
+            whole={**_options(),"skip_download":False,"format":selector(min(height,720)),
+                   "outtmpl":str(cache/(info["id"]+".%(ext)s")),"merge_output_format":"mp4",
+                   "max_filesize":180*1024*1024,"progress_hooks":[bounded_progress],
+                   "fragment_retries":1,"concurrent_fragment_downloads":1}
+            with factory(whole) as ydl:ydl.download(["https://www.youtube.com/watch?v="+info["id"]])
+            source=next((p for p in cache.glob(info["id"]+".*") if p.suffix in {".mp4",".webm",".mkv"} and p.stat().st_size>0),None)
+        if source is None or source.stat().st_size>180*1024*1024:
+            raise PipelineError("Whole-source fallback did not produce bounded media")
+        ffmpeg("-ss",str(start),"-i",source,"-t",str(end-start),"-an","-c:v","libx264",
+               "-preset","veryfast","-crf","20","-pix_fmt","yuv420p","-movflags","+faststart",target,timeout=180)
+        method="native_whole_download_then_local_cut"
     meta=probe(target)
     stream=next((s for s in meta["streams"] if s.get("codec_type")=="video"),None)
     if stream is None:raise PipelineError("Excerpt has no decodable video")
     if float(meta["format"]["duration"])<end-start-.35:raise PipelineError("Downloaded excerpt is truncated")
     if int(stream.get("width",0))<480 or int(stream.get("height",0))<270:raise PipelineError("Excerpt resolution is too low")
+    save_json(target.with_suffix(".acquisition.json"),{"method":method,"range_error":range_error,
+              "source_id":info["id"],"start":start,"end":end})
     return target
 
 def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factory=None,api=None,limits=None,reviewer=None):
@@ -178,6 +208,7 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
     review_function=reviewer or inspect
     for info in ordered:
         if len(assets)>=limits.max_clips or time.monotonic()>deadline:break
+        shutil.rmtree(directory/"source-cache",ignore_errors=True)
         queried=set(info.get("query_scene_ids",[]))
         matches=[s for s in script["scenes"] if str(s["scene_id"]) in queried or context(info,s,script["title"])["subject_terms"]]
         matches=sorted(matches,key=lambda s:(
@@ -212,6 +243,7 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
                         "source_start_seconds":a,"source_end_seconds":b,"filming_or_upload_date":info.get("upload_date"),
                         "footage_presentation":segment["presentation"],"inspection":segment,"inspection_mode":reviewed["mode"],
                         "width":int(stream["width"]),"height":int(stream["height"]),
+                        "acquisition":read_json(path.with_suffix(".acquisition.json")) if path.with_suffix(".acquisition.json").exists() else {},
                         "duration_seconds":min(b-a,float(meta["format"]["duration"])),
                         "sha256":hashlib.sha256(path.read_bytes()).hexdigest()}
                 assets.append(record);assignments.setdefault(str(segment["scene_id"]),[]).append(ident)
@@ -221,6 +253,8 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
             except Exception as exc:
                 status.append({"video_id":info["id"],"status":"unavailable","reason":type(exc).__name__,"stage":"excerpt_download"})
                 print("Selected footage download unavailable: "+str(exc)[:180],flush=True)
+    # Keep selected excerpts, not large complete source movies, in Actions artifacts.
+    shutil.rmtree(directory/"source-cache",ignore_errors=True)
     result=checkpoint()
     print("YOUTUBE_DEEP_SEARCH "+__import__("json").dumps(result["summary"]),flush=True)
     return result
@@ -246,6 +280,7 @@ def bounded(script,directory,urls=(),timeout=None):
         except subprocess.TimeoutExpired:
             os.killpg(process.pid,signal.SIGKILL);process.wait()
         reason="whole_discovery_deadline"
+    shutil.rmtree(directory/"source-cache",ignore_errors=True)
     path=directory/"discovery.json"
     result=read_json(path) if path.exists() else {"assets":[],"scenes":{},"provider_status":[]}
     result["provider_status"].append({"provider":"YouTube","status":"unavailable","reason":reason})
