@@ -312,3 +312,18 @@ def test_insufficient_youtube_supply_uses_direct_sources_without_relabelling_the
     assert result["summary"]["youtube"]["accepted_clips"]==0
     assert result["summary"]["accepted_clips"]==1
     assert result["assets"][0]["provider"]=="Internet Archive"
+
+
+def test_researched_camera_excerpts_reuse_only_for_same_script_and_unchanged_bytes(tmp_path):
+    import hashlib
+    from history_of_countries.core import key
+    movie=tmp_path/"camera.mp4";movie.write_bytes(b"accepted-source-fixture")
+    script={"title":"Ethiopia","scenes":[scene()]}
+    report={"script_fingerprint":key(script),"assets":[{"path":str(movie),"sha256":hashlib.sha256(movie.read_bytes()).hexdigest(),
+            "source_url":"https://www.youtube.com/watch?v=abcdefghijk",
+            "inspection":{"camera_origin":"recorded_camera","clean_frame":True}}],
+            "inspection_reports":[{"source_id":"abcdefghijk","source_kind":"camera"}]}
+    assert youtube.reusable_discovery(report,script,tmp_path)
+    assert not youtube.reusable_discovery(report,{"title":"Japan","scenes":[scene()]},tmp_path)
+    movie.write_bytes(b"changed")
+    assert not youtube.reusable_discovery(report,script,tmp_path)

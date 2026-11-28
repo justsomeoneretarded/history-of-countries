@@ -324,10 +324,33 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
     print("YOUTUBE_DEEP_SEARCH "+__import__("json").dumps(result["summary"]),flush=True)
     return result
 
+def reusable_discovery(previous,script,directory):
+    """Reuse only this exact script's inspected, unchanged camera excerpts."""
+    if previous.get("script_fingerprint")!=key(script) or not previous.get("assets"):return False
+    reports={r.get("source_id"):r for r in previous.get("inspection_reports",[])}
+    root=Path(directory).resolve()
+    try:
+        for asset in previous["assets"]:
+            path=Path(asset["path"]).resolve()
+            if not path.is_relative_to(root) or not path.is_file():return False
+            if hashlib.sha256(path.read_bytes()).hexdigest()!=asset.get("sha256"):return False
+            inspected=asset.get("inspection",{})
+            if inspected.get("camera_origin")!="recorded_camera" or inspected.get("clean_frame") is not True:return False
+            source=video_id(asset["source_url"])
+            if reports.get(source,{}).get("source_kind") not in {"camera","mixed"}:return False
+        return True
+    except (KeyError,ValueError,TypeError,OSError,PipelineError):return False
+
 def bounded(script,directory,urls=(),timeout=None):
     """Whole-process deadline includes search, Gemini pacing and download children."""
     import signal,subprocess,sys
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
+    cached=directory/"discovery.json"
+    if cached.exists():
+        previous=read_json(cached)
+        if reusable_discovery(previous,script,directory):
+            print("Reusing inspected camera footage for the same script; hashes and paths verified.",flush=True)
+            return previous
     request=directory/"request.json";save_json(request,{"script":script,"urls":list(urls)})
     # A failed new attempt must never publish an old country/script discovery.
     save_json(directory/"discovery.json",{"version":VERSION,"script_fingerprint":key(script),
