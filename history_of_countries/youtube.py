@@ -44,7 +44,7 @@ class AccessLog:
 
 def _options(route=None):
     result={"quiet":True,"no_warnings":True,"noplaylist":True,"socket_timeout":12,
-            "retries":1,"extractor_retries":1,"skip_download":True,"ignoreerrors":False,
+            "retries":1,"extractor_retries":1,"format_sort":["res","vcodec:h264"],"skip_download":True,"ignoreerrors":False,
             "ignore_no_formats_error":True,"lazy_playlist":True}
     node=shutil.which("node")
     if node:result["js_runtimes"]={"node":{"path":node}}

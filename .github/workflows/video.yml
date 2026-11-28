@@ -44,7 +44,7 @@ on:
       resume_artifact:
         description: Checkpoint artifact
         type: choice
-        options: [countries-checkpoint, directed-checkpoint, director-audio]
+        options: [countries-checkpoint, directed-checkpoint, director-audio, footage-research]
         default: countries-checkpoint
 permissions:
   contents: read

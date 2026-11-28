@@ -25,7 +25,7 @@ def configure():
     artifact=request.get("resume_artifact","countries-checkpoint")
     if run and not re.fullmatch(r"[0-9]+",run):raise SystemExit("Numeric resume run ID required")
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",repo):raise SystemExit("owner/repository resume source required")
-    if artifact not in {"countries-checkpoint","directed-checkpoint","director-audio"}:raise SystemExit("Unsupported checkpoint artifact")
+    if artifact not in {"countries-checkpoint","directed-checkpoint","director-audio","footage-research"}:raise SystemExit("Unsupported checkpoint artifact")
     save_json("work/input.json",request)
     with open(os.environ["GITHUB_ENV"],"a") as env:
         env.write("RESUME_RUN="+run+"\nRESUME_REPOSITORY="+repo+"\nRESUME_ARTIFACT="+artifact+"\n")
@@ -37,8 +37,10 @@ def restore():
     destination.mkdir(parents=True,exist_ok=True)
     names=["script.json","script.txt","research.json","request.json","style-profile.json",
       "writing-metrics.json","editorial-writing.json","narration-metrics.json","directed-packaging.json","speech","director-chapters","voice-auditions"]
+    if os.getenv("RESUME_ARTIFACT") in {"countries-checkpoint","footage-research"}:
+        names+=["gemini","media"]
     if os.getenv("RESUME_ARTIFACT")=="countries-checkpoint":
-        names+=["gemini","media","simple-render","storyboard.json"]
+        names+=["simple-render","storyboard.json"]
     request=json.loads(Path("work/input.json").read_text())
     if request.get("fresh_pictures") is True:
         names=[name for name in names if name not in {"simple-render","storyboard.json"}]
@@ -46,8 +48,27 @@ def restore():
         path=source/name
         if path.is_dir():shutil.copytree(path,destination/name,dirs_exist_ok=True)
         elif path.is_file():shutil.copy2(path,destination/name)
+    # Research checkpoints and production checkpoints have different work roots.
+    # Rebase only local media-file fields; source URLs, claims and hashes stay intact.
+    root=destination.resolve()
+    def rebase(value):
+        if isinstance(value,list):return [rebase(v) for v in value]
+        if not isinstance(value,dict):return value
+        result={}
+        for field,item in value.items():
+            if field in {"path","local_path"} and isinstance(item,str) and item.startswith("/"):
+                for marker in ("/work/footage/","/work/countries/"):
+                    if marker not in item:continue
+                    candidate=(root/item.split(marker,1)[1]).resolve()
+                    if not candidate.is_relative_to(root):raise SystemExit("Checkpoint media path escapes the work directory")
+                    item=str(candidate);break
+            result[field]=rebase(item)
+        return result
+    for path in (destination/"media").rglob("*.json") if (destination/"media").exists() else []:
+        before=json.loads(path.read_text());after=rebase(before)
+        if after!=before:save_json(path,after)
     shutil.rmtree(source,ignore_errors=True)
-    print("Restored writing/narration only; animation programs and renders were omitted.")
+    print("Restored writing, available narration and licensed media; local media paths now use this run's work directory.")
 
 if __name__=="__main__":
     parser=argparse.ArgumentParser();parser.add_argument("command",choices=("configure","restore"))
