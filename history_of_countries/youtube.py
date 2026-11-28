@@ -284,7 +284,11 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
                 print("YouTube requires authentication on this hosted runner; preserving search results and using direct open sources.",flush=True)
                 break
     counters["authentication_blocked_candidates"]=blocked
-    ordered=fair_shortlist(metadata,script,limits.review_limit)
+    from .footage_triage import shortlist as camera_shortlist
+    ordered,triage=camera_shortlist(api,metadata,script,directory/"triage",limits.review_limit)
+    counters["camera_shortlist_count"]=len(ordered)
+    counters["camera_shortlist_mode"]=triage.get("mode")
+    checkpoint()
     def download(info,a,b,path,height=1080):
         return download_excerpt(info,a,b,path,height,ydl_factory=factory)
     review_function=reviewer or inspect
