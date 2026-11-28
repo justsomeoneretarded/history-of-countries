@@ -79,6 +79,7 @@ def print_evidence(report):
         item=read_json(path).get("info",{})
         if item.get("id") in reviewed:
             print("FOOTAGE_REVIEWED_METADATA "+json.dumps({k:item.get(k) for k in ("id","title","description","duration","license","uploader","upload_date")},ensure_ascii=False),flush=True)
+    print("FOOTAGE_SOURCE_SEARCHES "+json.dumps([row for row in report.get("provider_status",[]) if row.get("provider")!="YouTube" and row.get("status")=="searched"],ensure_ascii=False),flush=True)
     print("FOOTAGE_PROVIDER_FAILURES "+json.dumps([
         row for row in report.get("provider_status",[]) if row.get("status") in {"unavailable","skipped"}],ensure_ascii=False),flush=True)
 

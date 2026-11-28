@@ -235,7 +235,7 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
         path=directory/"metadata"/(item["id"]+".json")
         if path.exists():
             cached=read_json(path)
-            if time.time()-cached.get("checked_at",0)<86400 and "player_access" in cached.get("info",{}):
+            if time.time()-cached.get("checked_at",0)<86400 and cached.get("info",{}).get("player_access")=="available":
                 return {**cached["info"],"query_scene_ids":item["query_scene_ids"]},None
         try:
             access=AccessLog()

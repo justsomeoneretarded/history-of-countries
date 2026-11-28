@@ -63,7 +63,7 @@ def archive_candidates(session,script,directory,status,limit=36):
     seeds=archive_seeds(script);rows={ident:{"identifier":ident} for ident in seeds}
     name=country(script["title"])
     aliases=[name]+(["Abyssinia"] if "ethiop" in name.casefold() else [])
-    queries=["mediatype:movies AND ("+" OR ".join('"'+a.replace('"',"")+'"' for a in aliases)+")"]
+    queries=["mediatype:movies AND licenseurl:* AND ("+" OR ".join('"'+a.replace('"',"")+'"' for a in aliases)+")"]
     order=scene_review_order(script);by_id={str(s["scene_id"]):s for s in script["scenes"]}
     for ident in order:
         scene=by_id[ident]
@@ -113,10 +113,17 @@ def archive_candidates(session,script,directory,status,limit=36):
 def commons_candidates(session,script,directory,status):
     result={};order=scene_review_order(script);by_id={str(s["scene_id"]):s for s in script["scenes"]}
     used=set()
-    for ident in order:
+    physical=[s for s in script["scenes"] if words(s.get("asset_search_term",""))&PLACE_WORDS]
+    ordered=[str(s["scene_id"]) for s in physical]+order
+    for ident in ordered:
         scene=by_id[ident];query=scene.get("asset_search_term","")
         if "portrait" in query.casefold():continue
-        query=re.sub(r"\b(?:painting|photograph|historical)\b","",query,flags=re.I).strip()+" filetype:video"
+        if words(query)&PLACE_WORDS:
+            location=scene.get("location","").split(" and ")[0].strip()
+            if location:query=location
+        else:
+            query=re.sub(r"\b(?:painting|photograph|historical|countryside|portrait)\b","",query,flags=re.I).strip()
+        query+=" filetype:video"
         if query in used:continue
         used.add(query)
         if len(used)>10:break
@@ -147,7 +154,7 @@ def commons_candidates(session,script,directory,status):
 
 def discover(api,script,directory,max_reviews=8):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
-    signature=key("direct-footage-v1",script,max_reviews)
+    signature=key("direct-footage-v2-subject-searches",script,max_reviews)
     previous=directory/"discovery.json"
     if previous.exists():
         cached=read_json(previous)
