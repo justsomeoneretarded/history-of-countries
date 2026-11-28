@@ -2,4 +2,6 @@
 from .core import PipelineError
 
 class QuotaDeferred(PipelineError):
-    pass
+    def __init__(self,message,source="provider"):
+        super().__init__(message)
+        self.source=source

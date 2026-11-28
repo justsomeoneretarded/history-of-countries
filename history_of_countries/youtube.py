@@ -285,7 +285,11 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
                 break
     counters["authentication_blocked_candidates"]=blocked
     from .footage_triage import shortlist as camera_shortlist
-    ordered,triage=camera_shortlist(api,metadata,script,directory/"triage",limits.review_limit)
+    try:
+        ordered,triage=camera_shortlist(api,metadata,script,directory/"triage",limits.review_limit)
+    except QuotaDeferred as exc:
+        status.append({"provider":"Gemini","status":"unavailable","reason":"local_request_budget_deferred" if exc.source=="local_budget" else "Gemini_free_quota_deferred"})
+        return checkpoint()
     counters["camera_shortlist_count"]=len(ordered)
     counters["camera_shortlist_mode"]=triage.get("mode")
     checkpoint()
@@ -307,7 +311,7 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
             counters["video_reviews_completed"]+=1
             reviews.append(reviewed);checkpoint()
         except QuotaDeferred as exc:
-            status.append({"video_id":info["id"],"status":"unavailable","reason":"Gemini_free_quota_deferred"})
+            status.append({"video_id":info["id"],"status":"unavailable","reason":"local_request_budget_deferred" if exc.source=="local_budget" else "Gemini_free_quota_deferred"})
             print("Footage inspection paused; accepted clips and searches preserved: "+str(exc),flush=True);break
         except (PipelineError,ValueError,KeyError,TypeError,OSError) as exc:
             status.append({"video_id":info["id"],"status":"unavailable","reason":type(exc).__name__,"stage":"video_inspection"})

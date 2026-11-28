@@ -1,6 +1,6 @@
 """Gemini REST gateway: text direction and 3.8 TTS, shared pacing and checkpoints."""
 from __future__ import annotations
-import base64,copy,io,json,os,time,wave
+import base64,copy,io,json,os,time,uuid,wave
 from pathlib import Path
 import requests
 from .core import PipelineError,key,read_json,save_json
@@ -20,6 +20,9 @@ class MediaAPI:
   self.session=session or requests.Session();self.use_sdk=session is None;self.clock=clock;self.sleeper=sleeper
   self.ledger=Path(os.getenv('GEMINI_MEDIA_LEDGER',str(self.directory/'usage.json')))
   self.interval=max(65,float(os.getenv('GEMINI_INTERVAL_SECONDS','65')))
+  # Keep audit/pacing history across resumes, but bound work per Actions run.
+  # A guessed daily application ceiling must not impersonate the provider's quota.
+  self.run_id=os.getenv('GITHUB_RUN_ID') or os.environ.setdefault('GEMINI_BUDGET_SESSION',uuid.uuid4().hex)
  def request(self,model,endpoint,body,kind):
   if model not in (TEXT_MODELS if kind=='text' else TTS_MODELS):raise PipelineError('Unverified free-tier model; no paid fallback')
   if kind=='text':
@@ -58,13 +61,13 @@ class MediaAPI:
    state=read_json(self.ledger) if self.ledger.exists() else {'calls':[],'last_start':0}
    calls=[c for c in state['calls'] if self.clock()-c['time']<86400]
    budget=int(os.getenv('GEMINI_TEXT_REQUEST_BUDGET' if kind=='text' else 'GEMINI_TTS_REQUEST_BUDGET','48' if kind=='text' else '16'))
-   if sum(c['kind']==kind and c.get('model',model)==model for c in calls)>=budget:raise QuotaDeferred(f'Local {kind} daily budget exhausted; resume checkpoint later')
+   if sum(c['kind']==kind and c.get('model',model)==model and c.get('run_id')==self.run_id for c in calls)>=budget:raise QuotaDeferred(f'Local {kind} run budget exhausted; resume checkpoint later',source='local_budget')
    delay=max(0,state['last_start']+self.interval-self.clock())
    if delay:
     print(f'Gemini {kind}: pacing {delay:.0f}s',flush=True)
     while delay>0:
      wait=min(45,delay);self.sleeper(wait);delay-=wait
-   start=self.clock();calls.append({'time':start,'model':model,'kind':kind,'request':identity})
+   start=self.clock();calls.append({'time':start,'model':model,'kind':kind,'request':identity,'run_id':self.run_id})
    save_json(self.ledger,{'calls':calls,'last_start':start})
    try:
     if kind=='text' and self.use_sdk and mode!='prompt' and model!='gemini-4-hydrogen':

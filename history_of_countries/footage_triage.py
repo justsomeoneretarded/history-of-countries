@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 from .core import PipelineError,key,read_json,save_json
+from .gemini import QuotaDeferred
 from .footage_search import fair_shortlist,source_priority
 
 VERSION="camera-triage-v1"
@@ -61,6 +62,7 @@ def shortlist(api,metadata,script,directory,limit):
                 "scope":"Likely camera sources only; not visual approval."}
         save_json(path,result)
         return selected,result
+    except QuotaDeferred:raise
     except (PipelineError,ValueError,KeyError,TypeError) as exc:
         result={"fingerprint":signature,"mode":"local_camera_priority","error":type(exc).__name__}
         return fair_shortlist(metadata,script,limit),result
