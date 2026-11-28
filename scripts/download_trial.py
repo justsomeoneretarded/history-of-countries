@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import shutil
 import sys
 
 from history_of_countries.core import PipelineError, read_json, save_json
@@ -30,6 +31,8 @@ def main():
     cookie=Path(os.environ["YOUTUBE_COOKIE_FILE"]) if os.getenv("YOUTUBE_COOKIE_FILE") else None
     print("DOWNLOAD_SESSION "+json.dumps({"cookies_configured":bool(cookie and cookie.is_file()),
           "fallback_configured":bool(os.getenv("YTDLP_FALLBACK_PROXY"))}),flush=True)
+    # A restored checkpoint can contain an earlier probe clip; force fresh network transfers.
+    shutil.rmtree(work/"download-probe",ignore_errors=True)
     probe_downloads(work,{})
     results=read_json(work/"download-probe/results.json")["results"]
     passed=sum(row.get("status")=="downloaded" for row in results)

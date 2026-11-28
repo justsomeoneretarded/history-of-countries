@@ -1,4 +1,5 @@
 {
   "resume_run": "46129926170",
-  "purpose": "Verify both actual history sources with newly configured YOUTUBE_COOKIES and the Top10 WARP transport"
+  "purpose": "Fresh network downloads with newly configured session cookies; discard prior probe outputs",
+  "check_version": 2
 }
