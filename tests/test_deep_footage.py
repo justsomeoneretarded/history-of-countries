@@ -228,3 +228,49 @@ def test_historical_place_aliases_survive_foreign_language_discovery():
     passage=scene(asset_search_term="Aksum churches monuments",location="Aksum")
     assert youtube.related(info,passage)
     assert search.words("Adoua Adowa Adwa")=={"adwa"}
+
+
+def test_camera_asset_ranks_above_keyword_stuffed_explainers_and_music():
+    script={"title":"Ethiopia","scenes":[scene()]}
+    candidates=[
+        {"id":"music","title":"Lalibela Official Music Video","query_scene_ids":["1"]},
+        {"id":"essay","title":"Lalibela churches: The Untold Story","query_scene_ids":["1"]},
+        {"id":"camera","title":"Lalibela walking tour 4K","query_scene_ids":["1"]}]
+    assert search.fair_shortlist(candidates,script,1)[0]["id"]=="camera"
+    assert all(x["id"]!="music" for x in search.fair_shortlist(candidates,script,3))
+
+def test_review_budget_includes_late_chapters_and_ending():
+    chapters=["Hook"]*2+["Roots"]*6+["Catalyst"]*5+["Turning Point"]*6+["Aftermath"]*5
+    script={"title":"Ethiopia","scenes":[scene(i,chapter=c) for i,c in enumerate(chapters,1)]}
+    ordered=search.scene_review_order(script)
+    assert "24" in ordered[:10]
+    assert len(ordered)==24 and len(set(ordered))==24
+
+def test_synthetic_reconstruction_cannot_pass_conflicting_real_footage_flags():
+    info={"id":"abcdefghijk","title":"Yohannes IV","duration":200}
+    passage=scene(asset_search_term="Yohannes",location="Ethiopian Highlands",date_label="1889")
+    row=segment(presentation="period_event",historical_period_supported=True,
+                period_evidence="Reconstruction of a nineteenth-century royal court.")
+    raw={"summary":"Cinematic AI-generated historical reconstruction.","segments":[row]}
+    result=review.validate_segments(raw,info,[passage],[(60,120)])
+    assert not result["segments"]
+    assert "synthetic" in result["rejected_segments"][0]["reason"].lower()
+    raw={"summary":"A historical scene.","source_kind":"synthetic","segments":[row]}
+    assert not review.validate_segments(raw,info,[passage],[(60,120)])["segments"]
+
+def test_minor_quote_punctuation_can_be_repaired_but_unrelated_words_cannot():
+    text="At Lalibela, churches were carved into the rock."
+    assert review.spoken_anchor("At Lalibela churches",text)=="At Lalibela, churches"
+    assert review.spoken_anchor("A completely unrelated army invaded",text) is None
+
+def test_explicit_spoken_anchor_id_avoids_model_paraphrase_rejections():
+    row=segment(anchor_id="1:1",narration_anchor="A paraphrase of the supplied sentence")
+    result=review.validate_segments({"segments":[row]},source(),[scene()],[(60,120)])
+    assert result["segments"][0]["narration_anchor"]==scene()["narration"]
+    row["anchor_id"]="1:999"
+    assert not review.validate_segments({"segments":[row]},source(),[scene()],[(60,120)])["segments"]
+
+def test_clean_short_camera_shots_and_longer_seen_intervals_are_usable():
+    for start,end,expected in [(80,84,4),(60,110,30)]:
+        result=review.validate_segments({"segments":[segment(start=start,end=end)]},source(),[scene()],[(60,120)])
+        assert result["segments"][0]["end"]-result["segments"][0]["start"]==expected
