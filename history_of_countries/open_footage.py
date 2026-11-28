@@ -147,6 +147,14 @@ def commons_candidates(session,script,directory,status):
 
 def discover(api,script,directory,max_reviews=8):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
+    signature=key("direct-footage-v1",script,max_reviews)
+    previous=directory/"discovery.json"
+    if previous.exists():
+        cached=read_json(previous)
+        if cached.get("fingerprint")==signature and cached.get("assets") and all(
+            Path(a["path"]).exists() and Path(a["path"]).resolve().is_relative_to(directory.resolve()) and
+            hashlib.sha256(Path(a["path"]).read_bytes()).hexdigest()==a.get("sha256") for a in cached["assets"]):
+            return cached
     session=requests.Session();session.headers.update({"User-Agent":UA})
     status=[];assets=[];mapping={};reports=[];started=time.monotonic()
     candidates=archive_candidates(session,script,directory/"archive",status)
@@ -161,7 +169,7 @@ def discover(api,script,directory,max_reviews=8):
     ranked.sort(key=lambda row:-row[0])
     reviewed=0
     def checkpoint():
-        result={"assets":assets,"scenes":mapping,"provider_status":status,"inspection_reports":reports,
+        result={"fingerprint":signature,"assets":assets,"scenes":mapping,"provider_status":status,"inspection_reports":reports,
                 "summary":{"candidate_sources":len(candidates),"video_reviews":reviewed,"accepted_clips":len(assets),
                            "accepted_seconds":round(sum(a["duration_seconds"] for a in assets),2),
                            "scenes_with_footage":len(mapping),"elapsed_seconds":round(time.monotonic()-started,1)}}
@@ -169,6 +177,7 @@ def discover(api,script,directory,max_reviews=8):
     checkpoint()
     for score,info,matches in ranked:
         if reviewed>=max_reviews or time.monotonic()-started>1500:break
+        source=None
         try:
             source=stream_file(session,info["download_url"],directory/"sources"/(key(info["id"])+info["source_extension"]))
             measured=probe(source);info={**info,"local_path":str(source.resolve()),"duration":float(measured["format"]["duration"])}
@@ -200,6 +209,8 @@ def discover(api,script,directory,max_reviews=8):
         except (PipelineError,requests.RequestException,ValueError,KeyError,TypeError,OSError) as exc:
             status.append({"provider":info["provider"],"source_id":info["id"],"status":"unavailable","reason":type(exc).__name__,"detail":str(exc)[:250]})
             print("Open footage candidate unavailable: "+str(exc)[:250],flush=True)
+        finally:
+            if source is not None:source.unlink(missing_ok=True)
     result=checkpoint()
     print("OPEN_FOOTAGE_SEARCH "+__import__("json").dumps(result["summary"]),flush=True)
     return result
