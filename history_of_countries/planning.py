@@ -117,7 +117,7 @@ def _local_order(script,media,speech):
 
 def make(api,script,speech,media,directory):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
-    fingerprint=key("simple-order-v6-inspected-footage",script,[s["duration"] for s in speech["scenes"]],
+    fingerprint=key("simple-order-v7-short-excerpts",script,[s["duration"] for s in speech["scenes"]],
       [{k:a.get(k) for k in ("id","subject","date","context","sha256","width","height")} for a in media["assets"]],media["scenes"])
     path=directory/"storyboard.json"
     if path.exists():
@@ -167,15 +167,30 @@ def shots(script,speech,media,orders,fps=30):
             def fresh(aid):
                 asset=records[aid]
                 return asset.get("medium") not in VIDEO or float(asset.get("duration_seconds",asset.get("duration",0)))-video_offsets.get(aid,0)>=length-.02
-            available=[aid for aid in options if fresh(aid)]
-            if not available:raise PipelineError("Approved excerpts do not cover this passage without restarting the same footage")
-            aid=available[0];source_start=video_offsets.get(aid,0)
-            if records[aid].get("medium") in VIDEO:video_offsets[aid]=source_start+length
-            result.append({"scene_id":scene["scene_id"],"asset_id":aid,"global_start":begin/fps,
-              "global_end":finish/fps,"frames":b-a,"chapter":scene["chapter"],
-              "narration_context":scene["narration"],"year_label":scene["date_label"],
-              "motion":"hold","source_crop":False,"side_fill":"subtle",
-              "music_mood":"neutral" if scene["chapter"]=="Roots" else "somber" if scene.get("bg_music_mood")=="reflective" else "tense" if scene.get("bg_music_mood")=="tense" else "neutral",
-              "events":[],"source_start":source_start})
+            preferred=options[0]
+            asset=records[preferred]
+            remaining=float(asset.get("duration_seconds",asset.get("duration",0)))-video_offsets.get(preferred,0)
+            still=next((candidate for candidate in options if records[candidate].get("medium") not in VIDEO),None)
+            parts=[]
+            # A clean three-second camera excerpt should not disappear just because
+            # the spoken cue lasts four seconds. Keep its real speed and finish
+            # the cue with an approved still; do not freeze or loop the footage.
+            if asset.get("medium") in VIDEO and 3<=remaining<length-.02 and still:
+                clip_frames=min(b-a,math.floor(remaining*fps+1e-6))
+                parts=[(preferred,begin,begin+clip_frames),(still,begin+clip_frames,finish)]
+            else:
+                available=[candidate for candidate in options if fresh(candidate)]
+                if not available:raise PipelineError("Approved excerpts do not cover this passage without restarting the same footage")
+                parts=[(available[0],begin,finish)]
+            for aid,part_start,part_end in parts:
+                if part_end<=part_start:continue
+                source_start=video_offsets.get(aid,0)
+                if records[aid].get("medium") in VIDEO:video_offsets[aid]=source_start+(part_end-part_start)/fps
+                result.append({"scene_id":scene["scene_id"],"asset_id":aid,"global_start":part_start/fps,
+                  "global_end":part_end/fps,"frames":part_end-part_start,"chapter":scene["chapter"],
+                  "narration_context":scene["narration"],"year_label":scene["date_label"],
+                  "motion":"hold","source_crop":False,"side_fill":"subtle",
+                  "music_mood":"neutral" if scene["chapter"]=="Roots" else "somber" if scene.get("bg_music_mood")=="reflective" else "tense" if scene.get("bg_music_mood")=="tense" else "neutral",
+                  "events":[],"source_start":source_start})
         position+=seconds;cursor=end
     return result

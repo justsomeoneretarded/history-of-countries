@@ -7,7 +7,7 @@
   "ci_run": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46054314532",
   "tests_passed": 91,
   "delivery": {
-    "upload_ready": true,
+    "upload_ready": false,
     "preview": false,
     "duration_seconds": 542.0200000000001,
     "voice": "Charon",
@@ -17,7 +17,8 @@
     "image_animation": false,
     "outro_seconds": 1.2,
     "youtube_published": false,
-    "quality_scope": "Encoded-media, timing, speech-verification and provenance checks; no animation-score approval stage"
+    "quality_scope": "Encoded-media, timing, speech-verification and provenance checks; no animation-score approval stage",
+    "status": "needs_sourcing"
   },
   "story": {
     "words": 1488,
@@ -118,5 +119,23 @@
     "previous_images": "Pans/zooms and some cover framing",
     "current_images": "Whole original source images, proportionally contained; no image animation"
   },
-  "quality_scope": "Encoded-media, timing, speech-verification and provenance checks; no animation-score approval stage"
+  "quality_scope": "Encoded-media, timing, speech-verification and provenance checks; no animation-score approval stage",
+  "validation_scope": "Historical 27 November baseline. Its technical checks passed, but it does not meet the current moving-footage sourcing standard.",
+  "meets_current_sourcing_standard": false,
+  "production_reported_upload_ready_at_the_time": true,
+  "latest_download_verification": {
+    "date": "2026-11-28",
+    "run": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46177384089",
+    "commit": "c0c0f100a9b591d8176f0d92eebcd3605159bbb6",
+    "fresh_network_transfers": true,
+    "cookies_configured": true,
+    "route": "WARP",
+    "tested": 2,
+    "downloaded": 2,
+    "clip_seconds": [
+      10,
+      10.01
+    ],
+    "scope": "Transport compatibility only. Actual visual relevance and edited coverage are separate requirements."
+  }
 }
