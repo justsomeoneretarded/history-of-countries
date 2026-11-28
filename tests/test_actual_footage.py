@@ -11,7 +11,7 @@ def approved(ident,**extra):
 
 def test_only_complete_unambiguous_actual_excerpt_approval_can_pass():
     assert verify.decision(approved("a"))[0]
-    for row in (None,approved("a",confidence=float("nan")),approved("a",natural_image=False),
+    for row in (None,approved("a",confidence=float("nan")),approved("a",confidence=9),approved("a",natural_image=False),
                 approved("a",matches_observation=False),approved("a",clean_frame=False),
                 approved("a",real_camera_motion=False),approved("a",confidence=.7)):
         assert not verify.decision(row)[0]
@@ -62,3 +62,19 @@ def test_castle_inflection_and_verified_site_alias_work_but_an_unrelated_castle_
     row["observed"]="Stone castle walls and towers of a castle in Germany."
     info["title"]="Bavarian castle walking tour"
     assert not review.validate_segments({"source_kind":"camera","segments":[row]},info,[scene],[(0,60)])["segments"]
+
+def test_long_excerpts_are_split_into_at_most_sixty_seconds_per_actual_video_request(tmp_path):
+    base=assets(tmp_path)[0]
+    records=[{**base,"id":str(i),"subject":"Budget fixture "+str(i),"duration_seconds":30} for i in range(4)]
+    class Model:
+        calls=0
+        def request(self,model,endpoint,body,kind):
+            self.calls+=1
+            parts=body["contents"][0]["parts"]
+            assert len([part for part in parts if "inlineData" in part])==2
+            payload=json.loads(parts[0]["text"].split("CLIP DATA:\n",1)[1])
+            rows=[approved(row["asset_id"]) for row in payload]
+            return {"candidates":[{"content":{"parts":[{"text":json.dumps({"clips":rows})}]}}]}
+    api=Model()
+    accepted,_=verify.verify(api,records,tmp_path/"budget-review")
+    assert len(accepted)==4 and api.calls==2

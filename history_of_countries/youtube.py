@@ -200,7 +200,7 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
                  "error_counts":dict(Counter(row.get("reason","") for row in status if row.get("status")=="unavailable"))}
         result={"version":VERSION,"script_fingerprint":key(script),"requested_urls":list(urls),"assets":assets,"scenes":assignments,"provider_status":status,"summary":summary,
                 "inspection_reports":reviews,
-                "note":"Only explicit reusable rights plus actual Gemini video inspection qualify a clip. Missing footage remains visible; no login or DRM bypass."}
+                "note":"Source inspection and license checks propose camera excerpts. Actual acquired media receives a second inspection in footage-research.json before catalogue acceptance."}
         save_json(directory/"discovery.json",result)
         return result
     options=_options()

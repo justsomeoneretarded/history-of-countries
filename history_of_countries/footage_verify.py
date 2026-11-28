@@ -20,7 +20,7 @@ def decision(row):
     required=("matches_observation","real_camera_motion","clean_frame","natural_image")
     if not all(row.get(field) is True for field in required):return False,str(row.get("reason","Excerpt unsuitable"))
     confidence=row.get("confidence",0)
-    if type(confidence) not in (int,float) or not math.isfinite(confidence) or confidence<.8:return False,"Uncertain actual-excerpt verification"
+    if type(confidence) not in (int,float) or not math.isfinite(confidence) or not .8<=confidence<=1:return False,"Uncertain actual-excerpt verification"
     return True,str(row.get("reason","Actual excerpt verified"))
 
 def verify(api,assets,directory):
@@ -38,8 +38,16 @@ def verify(api,assets,directory):
             reports.append({"asset_id":asset["id"],"passed":passed,"reason":reason,"stage":"actual_excerpt","cached":True})
             if passed:accepted.append(asset)
         else:pending.append((asset,identity,cache))
-    for offset in range(0,len(pending),4):
-        batch=pending[offset:offset+4];parts=[];payload=[];previews=[]
+    batches=[];cursor=0
+    while cursor<len(pending):
+        batch=[];seconds=0.
+        for item in pending[cursor:cursor+4]:
+            estimate=max(3.,min(30.,float(item[0].get("duration_seconds",30))))
+            if batch and seconds+estimate>60:break
+            batch.append(item);seconds+=estimate
+        batches.append((cursor,batch));cursor+=len(batch)
+    for offset,batch in batches:
+        parts=[];payload=[];previews=[]
         try:
             total_bytes=0
             for index,(asset,identity,cache) in enumerate(batch):
