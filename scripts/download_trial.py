@@ -26,6 +26,26 @@ def configure():
         stream.write("DOWNLOAD_RESUME_RUN="+resume+"\n")
 
 
+def inspect_formats(work):
+    """Compare actual source formats on both configured routes; never print URLs."""
+    import yt_dlp
+    from history_of_countries import youtube,download_access
+    for ident in ("PJnJsHP2bzY","dc_SQ5n8EMg"):
+        for route in download_access.routes():
+            try:
+                settings={**youtube._options(route),"ignore_no_formats_error":False}
+                with yt_dlp.YoutubeDL(settings) as client:
+                    item=client.extract_info("https://www.youtube.com/watch?v="+ident,download=False)
+                formats=[fmt for fmt in item.get("formats",[]) if fmt.get("vcodec") not in (None,"none")]
+                print("DOWNLOAD_FORMATS "+json.dumps({"source_id":ident,"route":route,"status":"available",
+                      "license":item.get("license"),"duration":item.get("duration"),
+                      "formats":[{k:fmt.get(k) for k in ("format_id","width","height","filesize","filesize_approx","ext","protocol")}
+                                 for fmt in formats[-12:]]}),flush=True)
+            except Exception as exc:
+                print("DOWNLOAD_FORMATS "+json.dumps({"source_id":ident,"route":route,"status":"unavailable",
+                      "reason":youtube.download_failure_reason(exc)}),flush=True)
+
+
 def main():
     work=Path("work/footage")
     cookie=Path(os.environ["YOUTUBE_COOKIE_FILE"]) if os.getenv("YOUTUBE_COOKIE_FILE") else None
@@ -33,6 +53,7 @@ def main():
           "fallback_configured":bool(os.getenv("YTDLP_FALLBACK_PROXY"))}),flush=True)
     # A restored checkpoint can contain an earlier probe clip; force fresh network transfers.
     shutil.rmtree(work/"download-probe",ignore_errors=True)
+    inspect_formats(work)
     probe_downloads(work,{})
     results=read_json(work/"download-probe/results.json")["results"]
     passed=sum(row.get("status")=="downloaded" for row in results)

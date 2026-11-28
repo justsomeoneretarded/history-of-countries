@@ -1,5 +1,5 @@
 {
   "resume_run": "46129926170",
-  "purpose": "Fresh network downloads with newly configured session cookies; discard prior probe outputs",
-  "check_version": 2
+  "purpose": "Test actual source formats and fresh downloads with Top10 native selection, retries and 800 MB cap",
+  "check_version": 3
 }

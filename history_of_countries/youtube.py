@@ -43,8 +43,8 @@ class AccessLog:
     def error(self,message):self.warning(message)
 
 def _options(route=None):
-    result={"quiet":True,"no_warnings":True,"noplaylist":True,"socket_timeout":12,
-            "retries":1,"extractor_retries":1,"format_sort":["res","vcodec:h264"],"skip_download":True,"ignoreerrors":False,
+    result={"quiet":True,"no_warnings":True,"noplaylist":True,"socket_timeout":30,
+            "retries":3,"extractor_retries":1,"format_sort":["res","vcodec:h264"],"skip_download":True,"ignoreerrors":False,
             "ignore_no_formats_error":True,"lazy_playlist":True}
     node=shutil.which("node")
     if node:result["js_runtimes"]={"node":{"path":node}}
@@ -89,7 +89,8 @@ def _download_excerpt_route(info,start,end,target,height=1080,ydl_factory=None,r
         except (PipelineError,ValueError,KeyError):pass
         target.unlink(missing_ok=True)
     factory=ydl_factory or YoutubeDL
-    selector=lambda cap:f"bestvideo[ext=mp4][height<={cap}]/best[ext=mp4][height<={cap}]/bestvideo[height<={cap}]/best[height<={cap}]"
+    # Match Top10: native video+audio first, then cut the approved visual interval locally.
+    selector=lambda cap:f"bv[height<={cap}]+ba/b[height<={cap}]"
     settings={**_options(route),"skip_download":False,"format":selector(height),
               "outtmpl":str(target.with_suffix(".%(ext)s")),"merge_output_format":"mp4",
               "download_ranges":download_range_func(None,[(start,end)]),"force_keyframes_at_cuts":True,
@@ -113,7 +114,7 @@ def _download_excerpt_route(info,start,end,target,height=1080,ydl_factory=None,r
         range_error=type(exc).__name__
         # yt-dlp's native whole-file path can work when FFmpeg HTTP range requests fail.
         # Bound duration, bytes and elapsed download time independently.
-        if not 6<=float(info.get("duration") or 0)<=1800:
+        if not 6<=float(info.get("duration") or 0)<=3600:
             raise PipelineError("Range download unavailable; source exceeds whole-file fallback duration") from None
         target.unlink(missing_ok=True)
         cache=target.parent.parent/"source-cache";cache.mkdir(parents=True,exist_ok=True)
@@ -121,15 +122,16 @@ def _download_excerpt_route(info,start,end,target,height=1080,ydl_factory=None,r
         if source is None:
             begun=time.monotonic()
             def bounded_progress(event):
-                if event.get("downloaded_bytes",0)>180*1024*1024 or time.monotonic()-begun>180:
+                if event.get("downloaded_bytes",0)>800_000_000 or time.monotonic()-begun>300:
                     raise PipelineError("Whole-source fallback exceeded its byte/time budget")
-            whole={**_options(route),"skip_download":False,"format":selector(min(height,720)),
+            whole={**_options(route),"skip_download":False,"format":selector(min(height,1080)),
                    "outtmpl":str(cache/(info["id"]+".%(ext)s")),"merge_output_format":"mp4",
-                   "max_filesize":180*1024*1024,"progress_hooks":[bounded_progress],
-                   "fragment_retries":1,"concurrent_fragment_downloads":1}
+                   "max_filesize":800_000_000,"progress_hooks":[bounded_progress],
+                   "postprocessors":[{"key":"FFmpegVideoRemuxer","preferedformat":"mp4"}],
+                   "fragment_retries":3,"concurrent_fragment_downloads":1}
             with factory(whole) as ydl:ydl.download(["https://www.youtube.com/watch?v="+info["id"]])
             source=next((p for p in cache.glob(info["id"]+".*") if p.suffix in {".mp4",".webm",".mkv"} and p.stat().st_size>0),None)
-        if source is None or source.stat().st_size>180*1024*1024:
+        if source is None or source.stat().st_size>800_000_000:
             raise PipelineError("Whole-source fallback did not produce bounded media")
         ffmpeg("-ss",str(start),"-i",source,"-t",str(end-start),"-an","-c:v","libx264",
                "-preset","veryfast","-crf","20","-pix_fmt","yuv420p","-movflags","+faststart",target,timeout=180)
