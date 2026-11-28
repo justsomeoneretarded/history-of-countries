@@ -137,5 +137,45 @@
       10.01
     ],
     "scope": "Transport compatibility only. Actual visual relevance and edited coverage are separate requirements."
+  },
+  "latest_pipeline_verification": {
+    "date": "2026-11-28",
+    "code_commit": "e8d6cbb71a170d7b768fb326a0ec034d0a1928c7",
+    "ci_run": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46181930903",
+    "tests_passed": 154,
+    "scope": "Transport, actual media encoding, cache retention, bounded Gemini requests and sourcing contracts. Not proof of a completed new film."
+  },
+  "latest_footage_research": {
+    "date": "2026-11-28",
+    "run": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46181930910",
+    "stage": "research_rehearsal",
+    "upload_ready": false,
+    "script_words": 1517,
+    "approved_clips": 4,
+    "approved_seconds": 27,
+    "scenes_with_footage": 4,
+    "total_scenes": 24,
+    "youtube_candidates_preserved": 3,
+    "youtube_candidate_seconds": 15,
+    "youtube_candidates_passing_actual_excerpt_check": 0,
+    "remaining_scan_status": "YouTube returned sign-in challenges on direct and WARP routes before the new scan; cached acquired clips and quality decisions were retained.",
+    "rejections": [
+      "Channel logo visible in the acquired Gondar excerpt",
+      "Heavy painted/cartoon processing in two acquired Aksum excerpts",
+      "Archive excerpt below 480 by 270"
+    ],
+    "last_completed_search": {
+      "run": "https://github.com/justsomeoneretarded/history-of-countries/actions/runs/46181068806",
+      "queries": 200,
+      "result_rows": 799,
+      "unique_candidates": 531,
+      "metadata_inspected": 200
+    },
+    "configured_metadata_cap": 600,
+    "metadata_batch_cap": 100,
+    "actual_excerpt_batch_cap_seconds": 60,
+    "actual_excerpt_inline_byte_cap": 14680064,
+    "narration_generated_for_new_revision": false,
+    "new_full_video_rendered": false
   }
 }
