@@ -63,7 +63,14 @@ def archive_candidates(session,script,directory,status,limit=36):
     seeds=archive_seeds(script);rows={ident:{"identifier":ident} for ident in seeds}
     name=country(script["title"])
     aliases=[name]+(["Abyssinia"] if "ethiop" in name.casefold() else [])
-    queries=["mediatype:movies AND licenseurl:* AND ("+" OR ".join('"'+a.replace('"',"")+'"' for a in aliases)+")"]
+    aliases_query=" OR ".join('"'+alias.replace('"',"")+'"' for alias in aliases)
+    # Start with primary film collections, before broad results such as modern
+    # reposted explainers whose descriptions happen to mention the country.
+    queries=[
+        "mediatype:movies AND (collection:universal_newsreels OR collection:prelinger) AND ("+aliases_query+")",
+        "mediatype:movies AND licenseurl:* AND ("+" OR ".join('title:"'+alias.replace('"',"")+'"' for alias in aliases)+")",
+        "mediatype:movies AND licenseurl:* AND ("+aliases_query+")",
+    ]
     order=scene_review_order(script);by_id={str(s["scene_id"]):s for s in script["scenes"]}
     for ident in order:
         scene=by_id[ident]
@@ -154,16 +161,26 @@ def commons_candidates(session,script,directory,status):
 
 def discover(api,script,directory,max_reviews=8):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
-    signature=key("direct-footage-v2-subject-searches",script,max_reviews)
+    signature=key("direct-footage-v3-primary-collections",script,max_reviews)
+    script_id=key(script)
+    restored=None
     previous=directory/"discovery.json"
     if previous.exists():
         cached=read_json(previous)
-        if cached.get("fingerprint")==signature and cached.get("assets") and all(
+        verified=bool(cached.get("assets")) and all(
             Path(a["path"]).exists() and Path(a["path"]).resolve().is_relative_to(directory.resolve()) and
-            hashlib.sha256(Path(a["path"]).read_bytes()).hexdigest()==a.get("sha256") for a in cached["assets"]):
-            return cached
+            hashlib.sha256(Path(a["path"]).read_bytes()).hexdigest()==a.get("sha256") for a in cached["assets"])
+        if cached.get("fingerprint")==signature and verified:return cached
+        legacy=key("direct-footage-v2-subject-searches",script,max_reviews)
+        if verified and (cached.get("script_fingerprint")==script_id or cached.get("fingerprint")==legacy):
+            restored=cached
     session=requests.Session();session.headers.update({"User-Agent":UA})
-    status=[];assets=[];mapping={};reports=[];started=time.monotonic()
+    status=list((restored or {}).get("provider_status",[]))
+    assets=list((restored or {}).get("assets",[]))
+    mapping={k:list(v) for k,v in (restored or {}).get("scenes",{}).items()}
+    reports=list((restored or {}).get("inspection_reports",[]))
+    already_reviewed={row.get("source_id") for row in reports}
+    started=time.monotonic()
     candidates=archive_candidates(session,script,directory/"archive",status)
     candidates+=commons_candidates(session,script,directory/"commons",status)
     ranked=[]
@@ -176,13 +193,14 @@ def discover(api,script,directory,max_reviews=8):
     ranked.sort(key=lambda row:-row[0])
     reviewed=0
     def checkpoint():
-        result={"fingerprint":signature,"assets":assets,"scenes":mapping,"provider_status":status,"inspection_reports":reports,
-                "summary":{"candidate_sources":len(candidates),"video_reviews":reviewed,"accepted_clips":len(assets),
+        result={"fingerprint":signature,"script_fingerprint":script_id,"assets":assets,"scenes":mapping,"provider_status":status,"inspection_reports":reports,
+                "summary":{"candidate_sources":len(candidates),"video_reviews":reviewed,"reused_clips":len((restored or {}).get("assets",[])),"accepted_clips":len(assets),
                            "accepted_seconds":round(sum(a["duration_seconds"] for a in assets),2),
                            "scenes_with_footage":len(mapping),"elapsed_seconds":round(time.monotonic()-started,1)}}
         save_json(directory/"discovery.json",result);return result
     checkpoint()
     for score,info,matches in ranked:
+        if info["id"] in already_reviewed:continue
         if reviewed>=max_reviews or time.monotonic()-started>1500:break
         source=None
         try:
