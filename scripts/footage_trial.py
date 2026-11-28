@@ -68,12 +68,14 @@ def contact_sheet(assets,work):
 
 def print_evidence(report):
     print("FOOTAGE_INSPECTIONS "+json.dumps([
-        {k:r.get(k) for k in ("source_id","mode","summary","segments","rejected_segments","native_url_error","inspected_windows")}
+        {k:r.get(k) for k in ("source_id","mode","source_kind","summary","segments","rejected_segments","proposed_segments","native_url_error","inspected_windows")}
         for r in report.get("inspection_reports",[])],ensure_ascii=False),flush=True)
     print("FOOTAGE_LIBRARY "+json.dumps([
         {k:a.get(k) for k in ("id","subject","title","source_url","source_start_seconds","source_end_seconds",
-                              "duration_seconds","width","height","footage_presentation","inspection_mode","inspection")}
+                              "duration_seconds","width","height","footage_presentation","inspection_mode","inspection","acquisition")}
         for a in report.get("assets",[])],ensure_ascii=False),flush=True)
+    triage=Path("work/footage/media/youtube/triage/camera-shortlist.json")
+    if triage.exists():print("FOOTAGE_CAMERA_SHORTLIST "+json.dumps(read_json(triage),ensure_ascii=False),flush=True)
     reviewed={r.get("source_id") for r in report.get("inspection_reports",[])}
     for path in sorted(Path("work/footage/media/youtube/metadata").glob("*.json")):
         item=read_json(path).get("info",{})
