@@ -82,6 +82,46 @@ def print_evidence(report):
     print("FOOTAGE_PROVIDER_FAILURES "+json.dumps([
         row for row in report.get("provider_status",[]) if row.get("status") in {"unavailable","skipped"}],ensure_ascii=False),flush=True)
 
+def probe_downloads(work,report):
+    """Exercise public download compatibility without spending Gemini quota."""
+    import yt_dlp
+    import yt_dlp.version
+    from history_of_countries.core import probe
+    print("DOWNLOAD_RUNTIME "+json.dumps({"yt_dlp":yt_dlp.version.__version__,"node":shutil.which("node")}),flush=True)
+    results=[]
+    for ident in ("PJnJsHP2bzY","dc_SQ5n8EMg"):
+        meta=work/"media/youtube/metadata"/(ident+".json")
+        if not meta.exists():continue
+        info=read_json(meta)["info"]
+        if not youtube.reusable(info):continue
+        for client in ("default","web_safari","android_vr"):
+            def factory(options):
+                options={**options,"no_warnings":False,"socket_timeout":8,"retries":0,"extractor_retries":0}
+                if client!="default":options["extractor_args"]={"youtube":{"player_client":[client]}}
+                return yt_dlp.YoutubeDL(options)
+            row={"source_id":ident,"title":info["title"],"client":client}
+            try:
+                path=youtube.download_excerpt(info,60,70,work/"download-probe/clips"/(ident+"-"+client+".mp4"),
+                                              height=720,ydl_factory=factory)
+                measured=probe(path)
+                row.update(status="downloaded",seconds=float(measured["format"]["duration"]),bytes=path.stat().st_size)
+                results.append(row);print("DOWNLOAD_PROBE "+json.dumps(row),flush=True);break
+            except Exception as exc:
+                row.update(status="unavailable",error=str(exc)[:1200])
+                results.append(row);print("DOWNLOAD_PROBE "+json.dumps(row),flush=True)
+                if re.search(r"sign in|captcha|private|members.only",str(exc),re.I):break
+    # A pinned public-domain archive already used by the project tests direct-source access.
+    try:
+        raw=requests.get("https://archive.org/metadata/1960-09-22_25_years_ago",timeout=(8,25))
+        raw.raise_for_status();data=raw.json();meta=data.get("metadata",{})
+        movies=sorted((f for f in data.get("files",[]) if str(f.get("name","")).endswith(".mp4") and
+                       0<int(f.get("size",0))<100*1024*1024),key=lambda f:int(f["size"]))
+        print("ARCHIVE_ACCESS_PROBE "+json.dumps({"status":"metadata_available","licenseurl":meta.get("licenseurl"),
+              "rights":meta.get("rights"),"title":meta.get("title"),"mp4_files":[{k:f.get(k) for k in ("name","size","length","format")} for f in movies[:4]]}),flush=True)
+    except Exception as exc:print("ARCHIVE_ACCESS_PROBE "+json.dumps({"status":"unavailable","error":str(exc)[:300]}),flush=True)
+    shutil.rmtree(work/"download-probe/source-cache",ignore_errors=True)
+    save_json(work/"download-probe/results.json",{"results":results,"scope":"Download compatibility only; no footage accepted for production."})
+
 def configure():
     request=input_request()
     resume=str(request.get("resume_run",""))
@@ -95,6 +135,10 @@ def main():
     restore=Path("work/footage-restore")
     if restore.exists():shutil.copytree(restore,work,dirs_exist_ok=True)
     save_json(work/"input.json",request)
+    if request.get("download_probe") is True:
+        report=read_json(work/"media/youtube/discovery.json")
+        probe_downloads(work,report)
+        return
     if request.get("evidence_only") is True:
         report=read_json(work/"media/youtube/discovery.json")
         print("FOOTAGE_REHEARSAL "+json.dumps(read_json(work/"summary.json")),flush=True)
