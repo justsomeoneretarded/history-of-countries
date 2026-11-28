@@ -1,0 +1,69 @@
+name: Check YouTube download session
+on:
+  push:
+    branches: [main]
+    paths: ['production/download-tests/*.json']
+  workflow_dispatch:
+    inputs:
+      resume_run:
+        description: Footage research checkpoint containing test metadata
+        required: true
+        default: '46129926170'
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: countries-download-check
+  cancel-in-progress: false
+jobs:
+  download:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python scripts/bootstrap_media.py
+      - run: python -m pip install -e .
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Configure private YouTube session
+        env:
+          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
+        run: python scripts/prepare_cookies.py
+      - name: Start proof-of-origin service
+        continue-on-error: true
+        run: docker run --name bgutil-provider -d --init -p 127.0.0.1:4416:4416 brainicism/bgutil-ytdlp-pot-provider
+      - name: Prepare WARP route
+        continue-on-error: true
+        timeout-minutes: 5
+        run: bash scripts/warp_proxy.sh
+      - name: Select test checkpoint
+        run: python scripts/download_trial.py --configure
+      - name: Restore public source metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: footage-research
+          run-id: ${{ env.DOWNLOAD_RESUME_RUN }}
+          github-token: ${{ github.token }}
+          path: work/footage
+      - name: Test real downloads with production settings
+        run: python scripts/download_trial.py
+      - name: Save download evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: download-check
+          path: work/footage/download-probe
+          retention-days: 7
+      - name: Remove private session and WARP profile
+        if: always()
+        run: python scripts/cleanup_download_access.py

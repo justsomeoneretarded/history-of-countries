@@ -50,17 +50,32 @@ def _options(route=None):
     if node:result["js_runtimes"]={"node":{"path":node}}
     return download_access.options(result,route or download_access.routes()[0])
 
+def download_failure_reason(exc):
+    """Useful diagnostics without echoing signed URLs, proxies or cookie contents."""
+    message=str(exc).casefold()
+    if re.search(r"sign in|not a bot|authentication|login required|captcha",message):return "authentication_required"
+    if re.search(r"403|forbidden",message):return "http_403"
+    if re.search(r"429|too many requests",message):return "rate_limited"
+    if re.search(r"requested format|no video formats|no downloadable",message):return "format_unavailable"
+    if re.search(r"source exceeds.*duration",message):return "source_duration_budget"
+    if re.search(r"byte/time budget|size budget|bounded media|too large|larger than",message):return "source_size_or_time_budget"
+    if re.search(r"timed out|timeout",message):return "network_timeout"
+    if re.search(r"truncated",message):return "truncated_media"
+    if re.search(r"resolution",message):return "resolution_too_low"
+    return type(exc).__name__
+
+
 def download_excerpt(info,start,end,target,height=1080,ydl_factory=None):
-    """Retry through the configured public network route, preserving source checks."""
-    last=None
+    """Retry configured routes and retain safe reasons for each failed attempt."""
+    failures=[]
     for route in download_access.routes():
         try:
             path=_download_excerpt_route(info,start,end,target,height,ydl_factory,route)
             download_access.record_route_success(route)
             return path
         except Exception as exc:
-            last=exc
-    raise PipelineError("Public footage download failed on configured routes ("+type(last).__name__+")") from None
+            failures.append(route+":"+download_failure_reason(exc))
+    raise PipelineError("Public footage download failed ("+", ".join(failures)+")") from None
 
 def _download_excerpt_route(info,start,end,target,height=1080,ydl_factory=None,route="direct"):
     from yt_dlp import YoutubeDL
