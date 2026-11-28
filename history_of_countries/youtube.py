@@ -198,7 +198,7 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
                  "elapsed_seconds":round(time.monotonic()-started,1),
                  "uncovered_scene_ids":[str(s["scene_id"]) for s in script["scenes"] if not assignments.get(str(s["scene_id"]))],
                  "error_counts":dict(Counter(row.get("reason","") for row in status if row.get("status")=="unavailable"))}
-        result={"version":VERSION,"script_fingerprint":key(script),"assets":assets,"scenes":assignments,"provider_status":status,"summary":summary,
+        result={"version":VERSION,"script_fingerprint":key(script),"requested_urls":list(urls),"assets":assets,"scenes":assignments,"provider_status":status,"summary":summary,
                 "inspection_reports":reviews,
                 "note":"Only explicit reusable rights plus actual Gemini video inspection qualify a clip. Missing footage remains visible; no login or DRM bypass."}
         save_json(directory/"discovery.json",result)
@@ -290,6 +290,10 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
     except QuotaDeferred as exc:
         status.append({"provider":"Gemini","status":"unavailable","reason":"local_request_budget_deferred" if exc.source=="local_budget" else "Gemini_free_quota_deferred"})
         return checkpoint()
+    # Explicit source URLs are useful curated leads. Inspect their real video
+    # even when a metadata-only model omitted them; all visual checks still apply.
+    pinned=[item for item in metadata if item["id"] in manual_ids]
+    ordered=(pinned+[item for item in ordered if item["id"] not in manual_ids])[:limits.review_limit]
     counters["camera_shortlist_count"]=len(ordered)
     counters["camera_shortlist_mode"]=triage.get("mode")
     checkpoint()
@@ -373,7 +377,7 @@ def bounded(script,directory,urls=(),timeout=None):
     cached=directory/"discovery.json"
     if cached.exists():
         previous=read_json(cached)
-        if reusable_discovery(previous,script,directory):
+        if reusable_discovery(previous,script,directory) and previous.get("requested_urls",[])==list(urls):
             print("Reusing inspected camera footage for the same script; hashes and paths verified.",flush=True)
             return previous
     request=directory/"request.json";save_json(request,{"script":script,"urls":list(urls)})

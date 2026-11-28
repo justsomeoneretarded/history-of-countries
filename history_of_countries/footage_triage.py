@@ -40,8 +40,8 @@ def shortlist(api,metadata,script,directory,limit):
         return fair_shortlist(metadata,script,limit),{"mode":"local_camera_priority"}
     payload={"title":script["title"],"limit":limit,
       "scenes":[{k:s.get(k) for k in ("scene_id","narration","date_label","location","asset_search_term")} for s in script["scenes"]],
-      "sources":[{"id":item["id"],"title":item.get("title"),"description":str(item.get("description",""))[:650],
-                  "duration":item.get("duration"),"query_scene_ids":item.get("query_scene_ids",[])} for item in metadata]}
+      "sources":[{"id":item["id"],"title":str(item.get("title",""))[:120],"description":str(item.get("description",""))[:240],
+                  "duration":item.get("duration"),"query_scene_ids":item.get("query_scene_ids",[])[:6]} for item in metadata]}
     try:
         raw=api.text(
             "Screen candidate metadata for an original documentary's picture researcher. You have NOT watched these videos. "

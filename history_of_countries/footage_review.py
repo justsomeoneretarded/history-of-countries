@@ -223,7 +223,7 @@ def inspect(api,info,scenes,directory,download):
     cache=directory/(identity+".json")
     if cache.exists():
         saved=read_json(cache)
-        return {**saved,**validate_segments(saved,info,scenes,windows)}
+        return {**saved,**validate_segments({**saved,"segments":saved.get("proposed_segments",saved["segments"])},info,scenes,windows)}
     payload={"source":{"id":info["id"],"title":info.get("title"),"description":str(info.get("description",""))[:2200],
                        "duration":info.get("duration"),"chapters":info.get("chapters",[]),
                        "source_url":info.get("source_url"),"depicted_years":info.get("depicted_years",[]),
