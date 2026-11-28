@@ -115,6 +115,15 @@ def run(request,work,output):
         media_script={**script,"scenes":script["scenes"][:3]} if request["phase"]=="preview" else script
         bootstrap.ensure(script["title"])
         catalogue=media.build(media_script,work/"media",use_youtube=request["youtube"],youtube_urls=request["youtube_urls"])
+        if request["phase"]=="full" and request["youtube"]:
+            feasibility=sourcing.preflight(catalogue,request["minutes"])
+            save_json(output/"sourcing-preflight.json",feasibility)
+            if not feasibility["possible"]:
+                save_json(output/"delivery.json",{"upload_ready":False,"status":"needs_sourcing","stage":"before_narration"})
+                save_json(work/"progress.json",{"complete":False,"stage":"needs_sourcing","output":str(output)})
+                raise PipelineError("Not enough inspected footage to satisfy the full edit: "+
+                    str(feasibility["available_footage_seconds"])+"s available, at least "+
+                    str(feasibility["minimum_required_footage_seconds"])+"s needed. Writing and media are saved; TTS quota was not spent.")
     # Resolve sourcing before spending free TTS quota. The writing pass is cached.
     code=director_script.main(["--stage","all","--title",request["title"],"--brief",request["brief"],
       "--voice",request["voice"],"--minutes",str(request["minutes"]),"--work",str(work),*draft_args])

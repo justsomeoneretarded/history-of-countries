@@ -1,12 +1,40 @@
 """Measured footage coverage and visible holds; technical success is not editorial readiness."""
+import math
 import os
 from .core import PipelineError
 from .planning import VIDEO
 
-def assess(script,catalog,shots,required=True):
+def minimum_fraction():
     try:minimum=float(os.getenv("FOOTAGE_MIN_FRACTION","0.25"))
     except ValueError:raise PipelineError("FOOTAGE_MIN_FRACTION must be numeric") from None
     if not .05<=minimum<=.8:raise PipelineError("FOOTAGE_MIN_FRACTION must be between 0.05 and 0.8")
+    return minimum
+
+
+def preflight(catalog,target_minutes):
+    """Reject an impossible footage target before spending narration quota.
+
+    This is an optimistic supply bound, not a prediction of the final edit.
+    """
+    from .core import duration
+    minimum=minimum_fraction()
+    required=minimum*.9*float(target_minutes)*60
+    unique={}
+    for asset in catalog["assets"]:
+        if asset.get("medium") not in VIDEO:continue
+        seconds=asset.get("duration_seconds",asset.get("duration"))
+        if type(seconds) not in (int,float) or not math.isfinite(seconds):
+            seconds=duration(asset["path"]) if asset.get("path") else 0.
+        unique[asset["id"]]=max(unique.get(asset["id"],0.),max(0.,seconds))
+    supplied=sum(unique.values())
+    return {"possible":supplied+.05>=required,"status":"possible" if supplied+.05>=required else "needs_sourcing",
+            "minimum_footage_fraction":minimum,"available_footage_seconds":round(supplied,3),
+            "minimum_required_footage_seconds":round(required,3),"target_minutes":target_minutes,
+            "scope":"Optimistic footage supply before TTS; actual edited coverage is checked separately."}
+
+
+def assess(script,catalog,shots,required=True):
+    minimum=minimum_fraction()
     records={a["id"]:a for a in catalog["assets"]}
     total=sum(s["global_end"]-s["global_start"] for s in shots)
     moving=0.;youtube_seconds=0.;covered=set();holds=[];current=None;image_area=0.;image_time=0.
