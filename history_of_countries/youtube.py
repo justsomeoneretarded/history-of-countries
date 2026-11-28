@@ -377,7 +377,7 @@ def bounded(script,directory,urls=(),timeout=None):
     cached=directory/"discovery.json"
     if cached.exists():
         previous=read_json(cached)
-        if reusable_discovery(previous,script,directory) and previous.get("requested_urls",[])==list(urls):
+        if os.getenv("YOUTUBE_FORCE_RESEARCH")!="true" and reusable_discovery(previous,script,directory) and previous.get("requested_urls",[])==list(urls):
             print("Reusing inspected camera footage for the same script; hashes and paths verified.",flush=True)
             return previous
     request=directory/"request.json";save_json(request,{"script":script,"urls":list(urls)})

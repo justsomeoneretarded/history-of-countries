@@ -162,7 +162,9 @@ def validate_segments(raw,info,scenes,windows):
                 visible=words(row["observed"]+" "+str(info.get("title","")))
                 named=words(scene.get("location","")+" "+scene.get("asset_search_term",""))
                 generic={"ethiopia","ethiopian","japan","japanese","country","highland","highlands","landscape","terrain"}
+                specific=named-generic-PLACE_WORDS-{"ancient","historical","modern","stone","rock","hewn","royal","medieval"}
                 if not (visible&named)-generic:raise ValueError("No identified surviving subject")
+                if specific and not specific&visible:raise ValueError("No specific surviving subject match")
                 if mode=="present_day_place":
                     place=words(scene.get("location",""))-generic
                     if not place&visible:raise ValueError("No specific named surviving location")

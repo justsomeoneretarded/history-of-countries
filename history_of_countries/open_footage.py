@@ -11,7 +11,7 @@ from .footage_search import context,source_priority,scene_review_order,words,PLA
 from .footage_review import inspect,validate_segments
 from .gemini import QuotaDeferred
 
-MAX_BYTES=180*1024*1024
+MAX_BYTES=800_000_000
 UA="HistoryOfCountries/2.0 (reusable documentary footage; provenance retained)"
 
 def clean(value):
@@ -40,7 +40,7 @@ def stream_file(session,url,target):
         with temporary.open("wb") as out:
             for chunk in response.iter_content(65536):
                 size+=len(chunk)
-                if size>MAX_BYTES or time.monotonic()-started>180:raise PipelineError("Open source download exceeded byte/time budget")
+                if size>MAX_BYTES or time.monotonic()-started>300:raise PipelineError("Open source download exceeded byte/time budget")
                 out.write(chunk)
         temporary.replace(target)
     finally:temporary.unlink(missing_ok=True)
@@ -219,6 +219,8 @@ def discover(api,script,directory,max_reviews=8):
                     ffmpeg("-ss",str(a),"-i",source,"-t",str(b-a),"-an","-c:v","libx264",
                            "-preset","veryfast","-crf","19","-pix_fmt","yuv420p","-movflags","+faststart",target,timeout=180)
                 data=probe(target);stream=next(s for s in data["streams"] if s["codec_type"]=="video")
+                if int(stream.get("width",0))<480 or int(stream.get("height",0))<270:
+                    raise PipelineError("Direct archive excerpt resolution is below 480 by 270")
                 assets.append({"id":aid,"path":str(target.resolve()),"title":info["title"],"subject":segment["observed"],
                     "provider":info["provider"],"source_url":info["source_url"],"creator":info["creator"],
                     "license":info["license"],"license_url":info["license_url"],"medium":"video",

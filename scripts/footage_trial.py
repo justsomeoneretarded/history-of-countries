@@ -67,6 +67,7 @@ def contact_sheet(assets,work):
     print("FOOTAGE_SHEET_END")
 
 def print_evidence(report):
+    print("FOOTAGE_EXCERPT_VERIFICATION "+json.dumps(report.get("excerpt_verification",[]),ensure_ascii=False),flush=True)
     print("FOOTAGE_INSPECTIONS "+json.dumps([
         {k:r.get(k) for k in ("source_id","mode","source_kind","summary","segments","rejected_segments","proposed_segments","native_url_error","inspected_windows")}
         for r in report.get("inspection_reports",[])],ensure_ascii=False),flush=True)

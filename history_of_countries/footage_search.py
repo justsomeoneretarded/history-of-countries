@@ -61,7 +61,9 @@ def words(text):
     folded=unicodedata.normalize("NFKD",str(text)).encode("ascii","ignore").decode().casefold()
     aliases={"axum":"aksum","adowa":"adwa","adoua":"adwa","adua":"adwa","gonder":"gondar",
              "abyssinia":"ethiopia","abissinia":"ethiopia","ethiopie":"ethiopia","ethiopian":"ethiopia",
-             "taitu":"taytu","betoul":"betul","ucciali":"wuchale","uccialli":"wuchale"}
+             "taitu":"taytu","betoul":"betul","ucciali":"wuchale","uccialli":"wuchale","castles":"castle","churches":"church",
+             "coins":"coin","monuments":"monument","manuscripts":"manuscript","obelisks":"obelisk",
+             "fasilides":"fasil","fasiladas":"fasil"}
     return {aliases.get(token,token) for token in re.findall(r"[a-z]{3,}",folded) if token not in STOPWORDS}
 
 def country(title):

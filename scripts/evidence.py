@@ -3,7 +3,7 @@ from pathlib import Path
 import base64,io,json
 from PIL import Image
 work=Path("work/countries");output=Path("output/countries")
-for root,names in ((work,["writing-metrics.json","editorial-writing.json","narration-metrics.json","progress.json","failure.json","voice-auditions/audition.json"]),(output,["quality.json","delivery.json","failure.json","media-discovery.json","package-checks.json","framing.json","final-listening.json","sourcing.json"])):
+for root,names in ((work,["writing-metrics.json","editorial-writing.json","narration-metrics.json","progress.json","failure.json","voice-auditions/audition.json"]),(output,["quality.json","delivery.json","failure.json","media-discovery.json","package-checks.json","framing.json","final-listening.json","sourcing.json","sourcing-preflight.json"])):
     for name in names:
         path=root/name
         if path.exists():

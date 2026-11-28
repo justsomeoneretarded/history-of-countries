@@ -305,6 +305,7 @@ def test_insufficient_youtube_supply_uses_direct_sources_without_relabelling_the
     monkeypatch.setattr(footage.youtube,"bounded",lambda *a,**k:{"assets":[],"scenes":{},"provider_status":[],
         "inspection_reports":[],"summary":{"accepted_clips":0}})
     monkeypatch.setattr(footage,"MediaAPI",lambda *a:object())
+    monkeypatch.setattr(footage.footage_verify,"verify",lambda api,assets,path:(assets,[]))
     movie={"id":"archive-camera","provider":"Internet Archive","duration_seconds":20}
     monkeypatch.setattr(footage.open_footage,"discover",lambda *a,**k:{"assets":[movie],"scenes":{"1":[movie["id"]]},
         "provider_status":[],"inspection_reports":[],"summary":{"accepted_clips":1}})
