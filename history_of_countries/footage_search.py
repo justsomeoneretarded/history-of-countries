@@ -66,6 +66,8 @@ def historical_years(text):
 
 def dated_event_evidence(info):
     """Discard explicit upload/remaster dates; retain historical recording evidence."""
+    declared=info.get("depicted_years",[])
+    if isinstance(declared,list) and declared and all(type(y) is int and 1<=y<=2100 for y in declared):return set(declared)
     heading=str(info.get("title",""))
     clean=re.sub(r"\b(?:uploaded|published|digitized|digitised|remastered|reuploaded|re-uploaded|colorized|colourized)\s*(?:in\s+)?(?:20\d{2})\b","",heading,flags=re.I)
     years=historical_years(clean)

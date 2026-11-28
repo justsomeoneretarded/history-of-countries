@@ -9,7 +9,7 @@ from PIL import Image
 from .core import ROOT,PipelineError,key,read_json,save_json
 from .documentary_assets import catalog,_download_image
 from .generic_assets import subject_terms,GENERIC_SUBJECT
-from . import youtube
+from . import youtube,footage
 
 def clean(text):
     return " ".join(html.unescape(re.sub(r"<[^>]+>"," ",str(text))).split())
@@ -93,7 +93,10 @@ def build(script,directory,use_youtube=True,youtube_urls=(),fetch=True):
         if missing:
             contextual={**script,"scenes":[{**s,"asset_search_term":(s.get("location","").split(" and ")[0] or country_name(script["title"]))} for s in missing]}
             _merge(result,commons(contextual,directory/"context",{},max_queries=8))
-        if use_youtube:_merge(result,youtube.bounded(script,directory/"youtube",youtube_urls))
+        if use_youtube:
+            researched=footage.discover(script,directory,youtube_urls)
+            _merge(result,researched)
+            result["footage_research"]=researched.get("summary",{})
     # A present-day landscape is useful for the closing reflection, separate
     # from the actual Pretoria agreement. It is never presented as war footage.
     for scene in script["scenes"]:

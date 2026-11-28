@@ -180,22 +180,50 @@ def _call(api,parts,payload):
     response=api.request(model,"models/"+model+":generateContent",body,"text")
     return json.loads("".join(p.get("text","") for p in response["candidates"][0]["content"]["parts"] if not p.get("thought")))
 
+def local_video_parts(source,windows,directory,payload):
+    """Small actual-video inputs; preserve absolute source-time mappings."""
+    parts=[];mappings=[];total_bytes=0
+    for index,(a,b) in enumerate(windows):
+        compact=directory/("local-"+str(index)+"-"+key(str(source),a,b)+".mp4")
+        if not compact.exists():
+            ffmpeg("-ss",str(a),"-i",source,"-t",str(b-a),"-an",
+                "-vf","scale=480:270:force_original_aspect_ratio=decrease",
+                "-c:v","libx264","-preset","veryfast","-crf","28","-maxrate","450k","-bufsize","900k",
+                "-movflags","+faststart",compact,timeout=180)
+        total_bytes+=compact.stat().st_size
+        if total_bytes>14*1024*1024:raise PipelineError("Local video review exceeds inline byte budget")
+        parts.append({"inlineData":{"mimeType":"video/mp4","data":base64.b64encode(compact.read_bytes()).decode()},
+                      "videoMetadata":{"fps":1}})
+        mappings.append({"input_index":index,"source_start":a,"source_end":b,"local_player_starts_at":0})
+    payload["local_previews"]=mappings
+    payload["timestamp_rule"]="For each local input add its source_start to local playback seconds. Return absolute source seconds."
+    return parts
+
 def inspect(api,info,scenes,directory,download):
     """Native YouTube video review; downloaded-video fallback if URL input fails."""
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
     windows=review_windows(info,scenes)
-    identity=key("video-inspection-v3-anchored-camera",info["id"],info.get("title"),info.get("description"),scenes,windows,
+    identity=key("video-inspection-v3-anchored-camera",info["id"],info.get("title"),info.get("description"),info.get("source_url"),info.get("depicted_years"),scenes,windows,
                  os.getenv("GEMINI_FOOTAGE_MODEL","gemini-3.5-flash-lite"))
     cache=directory/(identity+".json")
     if cache.exists():
         saved=read_json(cache)
         return {**saved,**validate_segments(saved,info,scenes,windows)}
     payload={"source":{"id":info["id"],"title":info.get("title"),"description":str(info.get("description",""))[:2200],
-                       "duration":info.get("duration"),"chapters":info.get("chapters",[])},
+                       "duration":info.get("duration"),"chapters":info.get("chapters",[]),
+                       "source_url":info.get("source_url"),"depicted_years":info.get("depicted_years",[]),
+                       "creator":info.get("creator"),"license":info.get("license")},
              "review_windows":[{"source_start":a,"source_end":b} for a,b in windows],
              "scenes":[{**{k:s.get(k) for k in ("scene_id","narration","date_label","location","asset_search_term")},
                         "anchors":scene_anchors(s)} for s in scenes]}
     if not windows:raise PipelineError("Candidate is too short for inspection")
+    if info.get("local_path"):
+        parts=local_video_parts(Path(info["local_path"]),windows,directory,payload)
+        raw=_call(api,parts,payload)
+        result=validate_segments(raw,info,scenes,windows)
+        result.update(mode="Gemini_direct_source_video",source_id=info["id"],model=os.getenv("GEMINI_FOOTAGE_MODEL","gemini-3.5-flash-lite"),
+                      inspected_windows=windows,native_url_error=None)
+        save_json(cache,result);return result
     parts=[{"fileData":{"fileUri":"https://www.youtube.com/watch?v="+info["id"]},
             "videoMetadata":{"fps":1,"startOffset":str(round(a,3))+"s","endOffset":str(round(b,3))+"s"}} for a,b in windows]
     remote_error=None

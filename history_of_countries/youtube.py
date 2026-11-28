@@ -33,6 +33,14 @@ def reusable(info):
             not info.get("has_drm"))
 
 
+class AccessLog:
+    def __init__(self):self.auth_required=False
+    def debug(self,message):pass
+    def warning(self,message):
+        if re.search(r"sign in to confirm|not a bot|authentication required|login required",str(message),re.I):
+            self.auth_required=True
+    def error(self,message):self.warning(message)
+
 def _options():
     result={"quiet":True,"no_warnings":True,"noplaylist":True,"socket_timeout":12,
             "retries":1,"extractor_retries":1,"skip_download":True,"ignoreerrors":False,
@@ -58,6 +66,7 @@ def download_excerpt(info,start,end,target,height=1080,ydl_factory=None):
               "outtmpl":str(target.with_suffix(".%(ext)s")),"merge_output_format":"mp4",
               "download_ranges":download_range_func(None,[(start,end)]),"force_keyframes_at_cuts":True,
               "external_downloader_args":{"ffmpeg_i":["-rw_timeout","15000000"]}}
+    access=AccessLog();settings["logger"]=access
     method="range_download";range_error=None
     try:
         with factory(settings) as ydl:ydl.download(["https://www.youtube.com/watch?v="+info["id"]])
@@ -70,6 +79,7 @@ def download_excerpt(info,start,end,target,height=1080,ydl_factory=None):
         meta=probe(target)
         if float(meta["format"]["duration"])<end-start-.35:raise PipelineError("Range excerpt is truncated")
     except Exception as exc:
+        if access.auth_required:raise PipelineError("YouTube requested authentication on this runner; download not attempted further") from None
         range_error=type(exc).__name__
         # yt-dlp's native whole-file path can work when FFmpeg HTTP range requests fail.
         # Bound duration, bytes and elapsed download time independently.
@@ -115,6 +125,23 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
     if api is None and (os.getenv("GEMINI_API") or os.getenv("GEMINI_API_KEY")):
         api=MediaAPI(directory.parent.parent/"gemini")
     started=time.monotonic();deadline=started+limits.total_seconds
+    # An explicit sign-in challenge is an access boundary, not a reason to try other clients.
+    access=AccessLog()
+    try:
+        test_url=list(urls)[0] if urls else "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+        with factory({**_options(),"logger":access}) as ydl:ydl.extract_info(test_url,download=False)
+    except Exception:pass
+    if access.auth_required:
+        result={"version":VERSION,"script_fingerprint":key(script),"assets":[],"scenes":{},
+                "provider_status":[{"provider":"YouTube","status":"unavailable","reason":"authentication_required_on_hosted_runner"}],
+                "summary":{"planned_queries":0,"attempted_queries":0,"accepted_clips":0,"accepted_seconds":0,
+                           "video_reviews_started":0,"authentication_blocked_candidates":1,
+                           "search_skipped_reason":"authentication_required_on_hosted_runner",
+                           "capacity_results":limits.max_queries*limits.results_per_query},
+                "inspection_reports":[]}
+        save_json(directory/"discovery.json",result)
+        print("YouTube requires sign-in on this runner; using direct open footage without bypassing the challenge.",flush=True)
+        return result
     queries,plan=plan_queries(api,script,directory,limits)
     assets=[];assignments={};status=[];candidates={};metadata=[];reviews=[]
     counters={"planned_queries":len(queries),"attempted_queries":0,"cached_queries":0,"search_result_rows":0,
@@ -182,26 +209,38 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
         path=directory/"metadata"/(item["id"]+".json")
         if path.exists():
             cached=read_json(path)
-            if time.time()-cached.get("checked_at",0)<86400:
+            if time.time()-cached.get("checked_at",0)<86400 and "player_access" in cached.get("info",{}):
                 return {**cached["info"],"query_scene_ids":item["query_scene_ids"]},None
         try:
-            with factory(options) as ydl:raw=ydl.extract_info("https://www.youtube.com/watch?v="+item["id"],download=False)
+            access=AccessLog()
+            with factory({**options,"logger":access}) as ydl:raw=ydl.extract_info("https://www.youtube.com/watch?v="+item["id"],download=False)
             if not isinstance(raw,dict):raise PipelineError("No video metadata")
             fields=("id","title","description","duration","license","is_live","availability","has_drm","chapters","uploader","channel","upload_date")
             info={k:raw.get(k) for k in fields};info["query_scene_ids"]=item["query_scene_ids"]
+            info["public_format_count"]=sum(bool(f.get("url")) and not f.get("has_drm") for f in (raw.get("formats") or []))
+            info["player_access"]="authentication_required" if access.auth_required else "available" if info["public_format_count"] else "no_public_formats"
             save_json(path,{"checked_at":time.time(),"info":info});return info,None
-        except Exception as exc:return item,type(exc).__name__
+        except Exception as exc:return {**item,"player_access":"authentication_required" if access.auth_required else "unknown"},type(exc).__name__
+    blocked=0
     with ThreadPoolExecutor(max_workers=limits.workers) as pool:
         for index in range(0,len(shortlist),limits.workers):
             if time.monotonic()>deadline:break
             for info,error in pool.map(metadata_for,shortlist[index:index+limits.workers]):
                 counters["metadata_inspected"]+=1
-                if error:status.append({"video_id":info["id"],"status":"unavailable","reason":error})
+                if info.get("player_access")=="authentication_required":
+                    blocked+=1;status.append({"provider":"YouTube","video_id":info["id"],"status":"unavailable","reason":"authentication_required_on_hosted_runner"})
+                elif error:status.append({"video_id":info["id"],"status":"unavailable","reason":error})
                 elif not reusable(info):status.append({"video_id":info["id"],"status":"skipped","reason":"Explicit reusable CC BY license not established"})
                 elif not isinstance(info.get("duration"),(int,float)) or not 6<=info["duration"]<=7200:
                     status.append({"video_id":info["id"],"status":"skipped","reason":"Source outside bounded inspection duration"})
+                elif not info.get("public_format_count"):
+                    status.append({"provider":"YouTube","video_id":info["id"],"status":"unavailable","reason":"no_downloadable_public_formats"})
                 else:metadata.append(info);counters["eligible_cc_candidates"]+=1
                 checkpoint()
+            if blocked>=3:
+                print("YouTube requires authentication on this hosted runner; preserving search results and using direct open sources.",flush=True)
+                break
+    counters["authentication_blocked_candidates"]=blocked
     ordered=fair_shortlist(metadata,script,limits.review_limit)
     def download(info,a,b,path,height=1080):
         return download_excerpt(info,a,b,path,height,ydl_factory=factory)

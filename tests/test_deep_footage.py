@@ -274,3 +274,41 @@ def test_clean_short_camera_shots_and_longer_seen_intervals_are_usable():
     for start,end,expected in [(80,84,4),(60,110,30)]:
         result=review.validate_segments({"segments":[segment(start=start,end=end)]},source(),[scene()],[(60,120)])
         assert result["segments"][0]["end"]-result["segments"][0]["start"]==expected
+
+
+def test_explicit_authentication_challenge_stops_youtube_before_model_calls(tmp_path):
+    class Blocked:
+        def __init__(self,options):self.options=options
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def extract_info(self,*a,**kw):
+            self.options["logger"].warning("Sign in to confirm you're not a bot.")
+            return {"id":"aqz-KE-bpKQ","title":"Public compatibility check","formats":[]}
+    class NoModel:
+        def text(self,*args,**kwargs):raise AssertionError("No model call for inaccessible downloads")
+    result=youtube.discover({"title":"Ethiopia","scenes":[scene()]},tmp_path,ydl_factory=Blocked,api=NoModel())
+    assert result["summary"]["attempted_queries"]==0
+    assert result["provider_status"][0]["reason"]=="authentication_required_on_hosted_runner"
+    assert not result["assets"]
+
+def test_primary_archive_licences_and_event_years_are_explicit():
+    from history_of_countries.open_footage import license_record
+    assert license_record("http://creativecommons.org/licenses/publicdomain/")["license"]=="Public domain"
+    assert license_record("https://creativecommons.org/licenses/by/4.0/")["license"]=="CC BY 4.0"
+    assert license_record("") is None
+    assert license_record("https://creativecommons.org/licenses/by-nc/4.0/") is None
+    info={"title":"25 Years Ago, 1960/09/22","depicted_years":[1935]}
+    assert search.dated_event_evidence(info)=={1935}
+
+def test_insufficient_youtube_supply_uses_direct_sources_without_relabelling_them(tmp_path,monkeypatch):
+    from history_of_countries import footage
+    monkeypatch.setattr(footage.youtube,"bounded",lambda *a,**k:{"assets":[],"scenes":{},"provider_status":[],
+        "inspection_reports":[],"summary":{"accepted_clips":0}})
+    monkeypatch.setattr(footage,"MediaAPI",lambda *a:object())
+    movie={"id":"archive-camera","provider":"Internet Archive","duration_seconds":20}
+    monkeypatch.setattr(footage.open_footage,"discover",lambda *a,**k:{"assets":[movie],"scenes":{"1":[movie["id"]]},
+        "provider_status":[],"inspection_reports":[],"summary":{"accepted_clips":1}})
+    result=footage.discover({"title":"Ethiopia","scenes":[scene()]},tmp_path)
+    assert result["summary"]["youtube"]["accepted_clips"]==0
+    assert result["summary"]["accepted_clips"]==1
+    assert result["assets"][0]["provider"]=="Internet Archive"

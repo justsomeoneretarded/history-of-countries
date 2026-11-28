@@ -10,7 +10,7 @@ import shutil
 import requests
 from PIL import Image,ImageDraw
 from history_of_countries.core import ROOT,PipelineError,read_json,save_json,ffmpeg
-from history_of_countries import director_script,youtube
+from history_of_countries import director_script,youtube,footage
 from history_of_countries.media_api import MediaAPI
 
 def input_request():
@@ -140,7 +140,7 @@ def main():
         probe_downloads(work,report)
         return
     if request.get("evidence_only") is True:
-        report=read_json(work/"media/youtube/discovery.json")
+        report=read_json(work/"media/footage-research.json") if (work/"media/footage-research.json").exists() else read_json(work/"media/youtube/discovery.json")
         print("FOOTAGE_REHEARSAL "+json.dumps(read_json(work/"summary.json")),flush=True)
         print_evidence(report)
         contact_sheet(report["assets"],work)
@@ -159,7 +159,7 @@ def main():
     try:compare_story(api,script,work)
     except (PipelineError,requests.RequestException,ValueError) as exc:
         save_json(work/"story-comparison.json",{"assessed":False,"error":str(exc)})
-    report=youtube.bounded(script,work/"media/youtube",request.get("youtube_urls",[]))
+    report=footage.discover(script,work/"media",request.get("youtube_urls",[]))
     save_json(work/"summary.json",{"upload_ready":False,"stage":"research_rehearsal","story_words":script["word_count"],
               "footage":report.get("summary",{}),
               "note":"These are available inspected excerpts. Actual edited footage coverage is measured separately at production."})
