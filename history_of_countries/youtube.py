@@ -146,22 +146,23 @@ def _download_excerpt_route(info,start,end,target,height=1080,ydl_factory=None,r
     return target
 
 def check_access(factory,urls=()):
-    """Find a working configured route once, then share it with subsequent requests."""
+    """Test several actual public sources; one video cannot establish a route-wide block."""
     blocked=False
-    test_url=list(urls)[0] if urls else "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+    probes=list(dict.fromkeys(urls))[:3] or ["https://www.youtube.com/watch?v=aqz-KE-bpKQ"]
     for route in download_access.routes():
-        log=AccessLog();raw=None
-        try:
-            with factory({**_options(route),"logger":log}) as ydl:raw=ydl.extract_info(test_url,download=False)
-        except Exception as exc:
-            blocked=blocked or bool(re.search(r"confirm you.re not a bot|sign in",str(exc),re.I))
-        blocked=blocked or log.auth_required
-        if not log.auth_required and isinstance(raw,dict) and any(f.get("url") for f in (raw.get("formats") or [])):
-            download_access.record_route_success(route)
-            return {"status":"available","route":route}
+        for test_url in probes:
+            log=AccessLog();raw=None
+            try:
+                with factory({**_options(route),"logger":log}) as ydl:raw=ydl.extract_info(test_url,download=False)
+            except Exception as exc:
+                blocked=blocked or bool(re.search(r"confirm you.re not a bot|sign in",str(exc),re.I))
+            blocked=blocked or log.auth_required
+            if not log.auth_required and isinstance(raw,dict) and any(f.get("url") for f in (raw.get("formats") or [])):
+                download_access.record_route_success(route)
+                return {"status":"available","route":route}
     return {"status":"authentication_required" if blocked else "unknown","route":None}
 
-def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factory=None,api=None,limits=None,reviewer=None):
+def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factory=None,api=None,limits=None,reviewer=None,access_urls=()):
     from yt_dlp import YoutubeDL
     from .footage_review import inspect
     from .media_api import MediaAPI
@@ -173,7 +174,7 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
     if api is None and (os.getenv("GEMINI_API") or os.getenv("GEMINI_API_KEY")):
         api=MediaAPI(directory.parent.parent/"gemini")
     started=time.monotonic();deadline=started+limits.total_seconds
-    route_check=check_access(factory,urls)
+    route_check=check_access(factory,list(urls)+list(access_urls))
     if route_check["status"]=="authentication_required":
         result={"version":VERSION,"script_fingerprint":key(script),"assets":[],"scenes":{},
                 "provider_status":[{"provider":"YouTube","status":"unavailable","reason":"authentication_required_on_hosted_runner"}],
@@ -370,17 +371,45 @@ def reusable_discovery(previous,script,directory):
         return True
     except (KeyError,ValueError,TypeError,OSError,PipelineError):return False
 
+def merge_cached_discovery(current,previous,script,directory):
+    """A blocked research retry must not erase previously inspected local clips."""
+    if not previous or not reusable_discovery(previous,script,directory):return current
+    if current.get("script_fingerprint")!=key(script):return current
+    new_ids={asset["id"] for asset in current.get("assets",[])}
+    retained=[asset for asset in previous["assets"] if asset["id"] not in new_ids]
+    if not retained:return current
+    merged={**current,"assets":list(current.get("assets",[]))+retained,
+            "scenes":{ident:list(ids) for ident,ids in current.get("scenes",{}).items()}}
+    retained_ids={asset["id"] for asset in retained}
+    for ident,ids in previous.get("scenes",{}).items():
+        kept=[aid for aid in ids if aid in retained_ids]
+        if kept:merged["scenes"][ident]=list(dict.fromkeys(merged["scenes"].get(ident,[])+kept))
+    reports={row.get("source_id"):row for row in previous.get("inspection_reports",[])}
+    reports.update({row.get("source_id"):row for row in current.get("inspection_reports",[])})
+    merged["inspection_reports"]=list(reports.values())
+    summary=current.get("summary",{})
+    merged["summary"]={**summary,"reused_clips":len(retained),"accepted_clips":len(merged["assets"]),
+        "accepted_seconds":round(sum(asset.get("duration_seconds",0) for asset in merged["assets"]),2),
+        "scenes_with_footage":len(merged["scenes"]),"total_scenes":len(script["scenes"]),
+        "uncovered_scene_ids":[str(scene["scene_id"]) for scene in script["scenes"] if str(scene["scene_id"]) not in merged["scenes"]]}
+    print("Preserved "+str(len(retained))+" inspected local excerpts from the same script after research retry.",flush=True)
+    return merged
+
+
 def bounded(script,directory,urls=(),timeout=None):
     """Whole-process deadline includes search, Gemini pacing and download children."""
     import signal,subprocess,sys
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
+    previous=None
     cached=directory/"discovery.json"
     if cached.exists():
         previous=read_json(cached)
         if os.getenv("YOUTUBE_FORCE_RESEARCH")!="true" and reusable_discovery(previous,script,directory) and previous.get("requested_urls",[])==list(urls):
             print("Reusing inspected camera footage for the same script; hashes and paths verified.",flush=True)
             return previous
-    request=directory/"request.json";save_json(request,{"script":script,"urls":list(urls)})
+    request=directory/"request.json"
+    probes=[asset["source_url"] for asset in (previous or {}).get("assets",[])] if previous and reusable_discovery(previous,script,directory) else []
+    save_json(request,{"script":script,"urls":list(urls),"access_urls":list(dict.fromkeys(probes))[:3]})
     # A failed new attempt must never publish an old country/script discovery.
     save_json(directory/"discovery.json",{"version":VERSION,"script_fingerprint":key(script),
               "assets":[],"scenes":{},"provider_status":[]})
@@ -389,7 +418,10 @@ def bounded(script,directory,urls=(),timeout=None):
                              start_new_session=True)
     try:
         code=process.wait(timeout=timeout)
-        if code==0 and (directory/"discovery.json").exists():return read_json(directory/"discovery.json")
+        if code==0 and (directory/"discovery.json").exists():
+            result=merge_cached_discovery(read_json(directory/"discovery.json"),previous,script,directory)
+            save_json(directory/"discovery.json",result)
+            return result
         reason="extractor_process_failed"
     except subprocess.TimeoutExpired:
         os.killpg(process.pid,signal.SIGTERM)
@@ -401,6 +433,7 @@ def bounded(script,directory,urls=(),timeout=None):
     path=directory/"discovery.json"
     result=read_json(path) if path.exists() else {"assets":[],"scenes":{},"provider_status":[]}
     result["provider_status"].append({"provider":"YouTube","status":"unavailable","reason":reason})
+    result=merge_cached_discovery(result,previous,script,directory)
     save_json(path,result);return result
 
 if __name__=="__main__":
@@ -409,4 +442,4 @@ if __name__=="__main__":
     parser.add_argument("--request",type=Path,required=True)
     parser.add_argument("--output",type=Path,required=True)
     args=parser.parse_args()
-    request=read_json(args.request);discover(request["script"],args.output,request.get("urls",[]))
+    request=read_json(args.request);discover(request["script"],args.output,request.get("urls",[]),access_urls=request.get("access_urls",[]))
