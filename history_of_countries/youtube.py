@@ -13,6 +13,7 @@ from urllib.parse import urlparse,parse_qs,urlencode
 from .core import PipelineError,key,read_json,save_json,probe
 from .footage_search import Limits,VERSION,context,related,plan_queries,fair_shortlist
 from .gemini import QuotaDeferred
+from . import download_access
 
 def video_id(url):
     parsed=urlparse(url)
@@ -41,15 +42,27 @@ class AccessLog:
             self.auth_required=True
     def error(self,message):self.warning(message)
 
-def _options():
+def _options(route=None):
     result={"quiet":True,"no_warnings":True,"noplaylist":True,"socket_timeout":12,
             "retries":1,"extractor_retries":1,"skip_download":True,"ignoreerrors":False,
             "ignore_no_formats_error":True,"lazy_playlist":True}
     node=shutil.which("node")
     if node:result["js_runtimes"]={"node":{"path":node}}
-    return result
+    return download_access.options(result,route or download_access.routes()[0])
 
 def download_excerpt(info,start,end,target,height=1080,ydl_factory=None):
+    """Retry through the configured public network route, preserving source checks."""
+    last=None
+    for route in download_access.routes():
+        try:
+            path=_download_excerpt_route(info,start,end,target,height,ydl_factory,route)
+            download_access.record_route_success(route)
+            return path
+        except Exception as exc:
+            last=exc
+    raise PipelineError("Public footage download failed on configured routes ("+type(last).__name__+")") from None
+
+def _download_excerpt_route(info,start,end,target,height=1080,ydl_factory=None,route="direct"):
     from yt_dlp import YoutubeDL
     from yt_dlp.utils import download_range_func
     from .core import ffmpeg
@@ -62,13 +75,15 @@ def download_excerpt(info,start,end,target,height=1080,ydl_factory=None):
         target.unlink(missing_ok=True)
     factory=ydl_factory or YoutubeDL
     selector=lambda cap:f"bestvideo[ext=mp4][height<={cap}]/best[ext=mp4][height<={cap}]/bestvideo[height<={cap}]/best[height<={cap}]"
-    settings={**_options(),"skip_download":False,"format":selector(height),
+    settings={**_options(route),"skip_download":False,"format":selector(height),
               "outtmpl":str(target.with_suffix(".%(ext)s")),"merge_output_format":"mp4",
               "download_ranges":download_range_func(None,[(start,end)]),"force_keyframes_at_cuts":True,
               "external_downloader_args":{"ffmpeg_i":["-rw_timeout","15000000"]}}
     access=AccessLog();settings["logger"]=access
     method="range_download";range_error=None
     try:
+        if str(settings.get("proxy","")).startswith(("socks5://","socks5h://")):
+            raise PipelineError("SOCKS routes use native downloading followed by local cutting")
         with factory(settings) as ydl:ydl.download(["https://www.youtube.com/watch?v="+info["id"]])
         actual=next((p for p in target.parent.glob(target.stem+".*") if p.suffix in {".mp4",".webm",".mkv"} and p.stat().st_size>0),None)
         if actual is None:raise PipelineError("YouTube did not produce an excerpt")
@@ -93,7 +108,7 @@ def download_excerpt(info,start,end,target,height=1080,ydl_factory=None):
             def bounded_progress(event):
                 if event.get("downloaded_bytes",0)>180*1024*1024 or time.monotonic()-begun>180:
                     raise PipelineError("Whole-source fallback exceeded its byte/time budget")
-            whole={**_options(),"skip_download":False,"format":selector(min(height,720)),
+            whole={**_options(route),"skip_download":False,"format":selector(min(height,720)),
                    "outtmpl":str(cache/(info["id"]+".%(ext)s")),"merge_output_format":"mp4",
                    "max_filesize":180*1024*1024,"progress_hooks":[bounded_progress],
                    "fragment_retries":1,"concurrent_fragment_downloads":1}
@@ -110,8 +125,24 @@ def download_excerpt(info,start,end,target,height=1080,ydl_factory=None):
     if float(meta["format"]["duration"])<end-start-.35:raise PipelineError("Downloaded excerpt is truncated")
     if int(stream.get("width",0))<480 or int(stream.get("height",0))<270:raise PipelineError("Excerpt resolution is too low")
     save_json(target.with_suffix(".acquisition.json"),{"method":method,"range_error":range_error,
-              "source_id":info["id"],"start":start,"end":end})
+              "source_id":info["id"],"start":start,"end":end,"route":route})
     return target
+
+def check_access(factory,urls=()):
+    """Find a working configured route once, then share it with subsequent requests."""
+    blocked=False
+    test_url=list(urls)[0] if urls else "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+    for route in download_access.routes():
+        log=AccessLog();raw=None
+        try:
+            with factory({**_options(route),"logger":log}) as ydl:raw=ydl.extract_info(test_url,download=False)
+        except Exception as exc:
+            blocked=blocked or bool(re.search(r"confirm you.re not a bot|sign in",str(exc),re.I))
+        blocked=blocked or log.auth_required
+        if not log.auth_required and isinstance(raw,dict) and any(f.get("url") for f in (raw.get("formats") or [])):
+            download_access.record_route_success(route)
+            return {"status":"available","route":route}
+    return {"status":"authentication_required" if blocked else "unknown","route":None}
 
 def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factory=None,api=None,limits=None,reviewer=None):
     from yt_dlp import YoutubeDL
@@ -125,13 +156,8 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
     if api is None and (os.getenv("GEMINI_API") or os.getenv("GEMINI_API_KEY")):
         api=MediaAPI(directory.parent.parent/"gemini")
     started=time.monotonic();deadline=started+limits.total_seconds
-    # An explicit sign-in challenge is an access boundary, not a reason to try other clients.
-    access=AccessLog()
-    try:
-        test_url=list(urls)[0] if urls else "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
-        with factory({**_options(),"logger":access}) as ydl:ydl.extract_info(test_url,download=False)
-    except Exception:pass
-    if access.auth_required:
+    route_check=check_access(factory,urls)
+    if route_check["status"]=="authentication_required":
         result={"version":VERSION,"script_fingerprint":key(script),"assets":[],"scenes":{},
                 "provider_status":[{"provider":"YouTube","status":"unavailable","reason":"authentication_required_on_hosted_runner"}],
                 "summary":{"planned_queries":0,"attempted_queries":0,"accepted_clips":0,"accepted_seconds":0,
@@ -145,7 +171,7 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
     queries,plan=plan_queries(api,script,directory,limits)
     assets=[];assignments={};status=[];candidates={};metadata=[];reviews=[]
     counters={"planned_queries":len(queries),"attempted_queries":0,"cached_queries":0,"search_result_rows":0,
-              "unique_candidates":0,"metadata_inspected":0,"eligible_cc_candidates":0,
+              "unique_candidates":0,"metadata_inspected":0,"access_route":route_check.get("route"),"eligible_cc_candidates":0,
               "video_reviews_started":0,"video_reviews_completed":0}
     def checkpoint():
         summary={**counters,"accepted_clips":len(assets),

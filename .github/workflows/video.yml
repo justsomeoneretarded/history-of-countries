@@ -118,6 +118,20 @@ jobs:
       - name: Keep only useful checkpoint files
         if: env.RESUME_RUN != ''
         run: python scripts/request.py restore
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Configure optional YouTube session
+        env:
+          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
+        run: python scripts/prepare_cookies.py
+      - name: Start YouTube proof-of-origin service
+        continue-on-error: true
+        run: docker run --name bgutil-provider -d --init -p 127.0.0.1:4416:4416 brainicism/bgutil-ytdlp-pot-provider
+      - name: Prepare Cloudflare WARP download route
+        continue-on-error: true
+        timeout-minutes: 5
+        run: bash scripts/warp_proxy.sh
       - name: Write, narrate and edit the video
         env:
           GEMINI_API_KEY: ${{ secrets.gemini_api_key }}
@@ -141,3 +155,6 @@ jobs:
           path: output/countries
           retention-days: 90
           if-no-files-found: warn
+      - name: Remove temporary download credentials and proxy
+        if: always()
+        run: python scripts/cleanup_download_access.py

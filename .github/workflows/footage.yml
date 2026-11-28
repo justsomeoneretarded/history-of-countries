@@ -58,6 +58,20 @@ jobs:
           cache: pip
       - run: python scripts/bootstrap_media.py
       - run: python -m pip install -e .
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Configure optional YouTube session
+        env:
+          YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
+        run: python scripts/prepare_cookies.py
+      - name: Start YouTube proof-of-origin service
+        continue-on-error: true
+        run: docker run --name bgutil-provider -d --init -p 127.0.0.1:4416:4416 brainicism/bgutil-ytdlp-pot-provider
+      - name: Prepare Cloudflare WARP download route
+        continue-on-error: true
+        timeout-minutes: 5
+        run: bash scripts/warp_proxy.sh
       - name: Select rehearsal input and checkpoint
         run: python scripts/footage_trial.py --configure
       - name: Restore prior footage research
@@ -80,3 +94,6 @@ jobs:
           path: work/footage
           retention-days: 30
           if-no-files-found: warn
+      - name: Remove temporary download credentials and proxy
+        if: always()
+        run: python scripts/cleanup_download_access.py

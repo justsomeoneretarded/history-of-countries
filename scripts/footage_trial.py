@@ -88,13 +88,15 @@ def probe_downloads(work,report):
     import yt_dlp.version
     from history_of_countries.core import probe
     print("DOWNLOAD_RUNTIME "+json.dumps({"yt_dlp":yt_dlp.version.__version__,"node":shutil.which("node")}),flush=True)
+    access=youtube.check_access(yt_dlp.YoutubeDL)
+    print("DOWNLOAD_ROUTE "+json.dumps(access),flush=True)
     results=[]
     for ident in ("PJnJsHP2bzY","dc_SQ5n8EMg"):
         meta=work/"media/youtube/metadata"/(ident+".json")
         if not meta.exists():continue
         info=read_json(meta)["info"]
         if not youtube.reusable(info):continue
-        for client in ("default","web_safari","android_vr"):
+        for client in ("default",):
             def factory(options):
                 options={**options,"no_warnings":False,"socket_timeout":8,"retries":0,"extractor_retries":0}
                 if client!="default":options["extractor_args"]={"youtube":{"player_client":[client]}}
