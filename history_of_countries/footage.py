@@ -35,10 +35,12 @@ def discover(script,directory,urls=()):
     yt_final=[asset for asset in verified if asset["id"] in youtube_ids]
     open_final=[asset for asset in verified if asset["id"] not in youtube_ids]
     def verified_summary(source,final):
+        covered={str(asset.get("inspection",{}).get("scene_id")) for asset in final if asset.get("inspection",{}).get("scene_id") is not None}
         return {**source,"acquired_clips":source.get("accepted_clips",0),"acquired_seconds":source.get("accepted_seconds",0),
                 "accepted_clips":len(final),"accepted_seconds":round(sum(asset.get("duration_seconds",0) for asset in final),2),
                 "actual_excerpt_check":True,
-                "scenes_with_footage":len({str(asset.get("inspection",{}).get("scene_id")) for asset in final if asset.get("inspection",{}).get("scene_id") is not None})}
+                "scenes_with_footage":len(covered),
+                "uncovered_scene_ids":[str(scene["scene_id"]) for scene in script["scenes"] if str(scene["scene_id"]) not in covered]}
     combined["summary"]={"youtube":verified_summary(yt.get("summary",{}),yt_final),
         "open_sources":verified_summary(direct.get("summary",{}),open_final),"acquired_clips":len(acquired),
         "accepted_clips":len(combined["assets"]),"accepted_seconds":round(sum(a.get("duration_seconds",0) for a in combined["assets"]),2),

@@ -176,7 +176,7 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
     started=time.monotonic();deadline=started+limits.total_seconds
     route_check=check_access(factory,list(urls)+list(access_urls))
     if route_check["status"]=="authentication_required":
-        result={"version":VERSION,"script_fingerprint":key(script),"assets":[],"scenes":{},
+        result={"version":VERSION,"script_fingerprint":key(script),"requested_urls":list(urls),"assets":[],"scenes":{},
                 "provider_status":[{"provider":"YouTube","status":"unavailable","reason":"authentication_required_on_hosted_runner"}],
                 "summary":{"planned_queries":0,"attempted_queries":0,"accepted_clips":0,"accepted_seconds":0,
                            "video_reviews_started":0,"authentication_blocked_candidates":1,
@@ -265,12 +265,13 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
             info["player_access"]="authentication_required" if access.auth_required else "available" if info["public_format_count"] else "no_public_formats"
             save_json(path,{"checked_at":time.time(),"info":info});return info,None
         except Exception as exc:return {**item,"player_access":"authentication_required" if access.auth_required else "unknown"},type(exc).__name__
-    blocked=0
+    blocked=0;blocked_streak=0
     with ThreadPoolExecutor(max_workers=limits.workers) as pool:
         for index in range(0,len(shortlist),limits.workers):
             if time.monotonic()>deadline:break
             for info,error in pool.map(metadata_for,shortlist[index:index+limits.workers]):
                 counters["metadata_inspected"]+=1
+                blocked_streak=blocked_streak+1 if info.get("player_access")=="authentication_required" else 0
                 if info.get("player_access")=="authentication_required":
                     blocked+=1;status.append({"provider":"YouTube","video_id":info["id"],"status":"unavailable","reason":"authentication_required_on_hosted_runner"})
                 elif error:status.append({"video_id":info["id"],"status":"unavailable","reason":error})
@@ -281,7 +282,7 @@ def discover(script,directory,urls=(),max_queries=None,max_clips=None,ydl_factor
                     status.append({"provider":"YouTube","video_id":info["id"],"status":"unavailable","reason":"no_downloadable_public_formats"})
                 else:metadata.append(info);counters["eligible_cc_candidates"]+=1
                 checkpoint()
-            if blocked>=3:
+            if blocked_streak>=3:
                 print("YouTube requires authentication on this hosted runner; preserving search results and using direct open sources.",flush=True)
                 break
     counters["authentication_blocked_candidates"]=blocked

@@ -5,6 +5,6 @@
   "youtube_urls": [
     "https://www.youtube.com/watch?v=PJnJsHP2bzY"
   ],
-  "resume_run": "46178906119",
-  "purpose": "Verify actual acquired clips while preserving cached footage across hosted-runner access failures; test multiple real sources"
+  "resume_run": "46181068806",
+  "purpose": "Screen all remaining candidates beyond the first 200 using bounded Gemini metadata batches, then inspect acquired video quality"
 }

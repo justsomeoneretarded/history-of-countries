@@ -35,7 +35,25 @@ def shortlist(api,metadata,script,directory,limit):
         return selected
     if path.exists():
         cached=read_json(path)
-        if cached.get("fingerprint")==signature:return decode(cached),cached
+        if cached.get("fingerprint")==signature and cached.get("complete",True):return decode(cached),cached
+    if len(metadata)>100 and api is not None:
+        collected={};deferred=None;batch_reports=[]
+        for start in range(0,len(metadata),100):
+            try:
+                chosen,report=shortlist(api,metadata[start:start+100],script,directory/("batch-"+str(start)),limit)
+                batch_reports.append({"offset":start,"selected":len(chosen),"mode":report.get("mode")})
+                for item in chosen:collected[item["id"]]=item
+            except QuotaDeferred as exc:
+                deferred=exc;break
+        selected=fair_shortlist(list(collected.values()),script,limit)
+        result={"fingerprint":signature,"mode":"Gemini_metadata_screening_batched","complete":deferred is None,
+                "batches":batch_reports,"selected_count":len(selected),
+                "candidates":[{"source_id":item["id"],"scene_ids":item["query_scene_ids"],
+                               "reason":"Likely camera material selected in a bounded metadata batch."} for item in selected],
+                "scope":"Likely camera sources only; not visual approval."}
+        save_json(path,result)
+        if deferred is not None and not selected:raise deferred
+        return selected,result
     if api is None:
         return fair_shortlist(metadata,script,limit),{"mode":"local_camera_priority"}
     payload={"title":script["title"],"limit":limit,

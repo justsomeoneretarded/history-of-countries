@@ -21,7 +21,7 @@ EVENT_WORDS = {"war","battle","invasion","famine","terror","massacre","revolutio
 class Limits:
     max_queries: int = 200
     results_per_query: int = 8
-    metadata_limit: int = 200
+    metadata_limit: int = 600
     review_limit: int = 16
     max_clips: int = 32
     search_seconds: int = 1200
@@ -33,7 +33,7 @@ class Limits:
         names = {
             "max_queries":("YOUTUBE_SEARCH_QUERIES",200,1,400),
             "results_per_query":("YOUTUBE_RESULTS_PER_QUERY",8,1,20),
-            "metadata_limit":("YOUTUBE_METADATA_LIMIT",200,1,200),
+            "metadata_limit":("YOUTUBE_METADATA_LIMIT",600,1,600),
             "review_limit":("YOUTUBE_REVIEW_LIMIT",16,1,32),
             "max_clips":("YOUTUBE_MAX_CLIPS",32,1,64),
             "search_seconds":("YOUTUBE_SEARCH_SECONDS",1200,30,2400),
